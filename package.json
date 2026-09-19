@@ -1,0 +1,11 @@
+{
+  "name": "runway",
+  "private": true,
+  "packageManager": "pnpm@10.33.2",
+  "scripts": {
+    "build": "pnpm --recursive --if-present run build",
+    "dev:web": "pnpm --filter @runway/web dev",
+    "lint": "pnpm --recursive --if-present run lint",
+    "typecheck": "pnpm --recursive --if-present run typecheck"
+  }
+}

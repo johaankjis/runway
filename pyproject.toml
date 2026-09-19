@@ -1,0 +1,13 @@
+[tool.pytest.ini_options]
+addopts = "-q"
+pythonpath = ["apps/api"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["apps/api/runway_api", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
