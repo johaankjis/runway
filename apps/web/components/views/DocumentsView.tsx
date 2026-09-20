@@ -17,7 +17,7 @@ import { cn } from "@/lib/cn";
 import { matchesDocumentFilter, type DocumentFilter } from "@/lib/presentation";
 
 /** The backend's extraction grammar currently covers supplier pricing notices. */
-const EXTRACTABLE_TYPES = new Set(["supplier_notice"]);
+const EXTRACTABLE_TYPES = new Set(["supplier_notice", "uploaded_document"]);
 
 function statusFor(document: Document, related: Signal[]): DocumentAnalysisStatus {
   const extracted = related.find((signal) => signal.extraction);
@@ -31,14 +31,19 @@ export function DocumentsView() {
   const signals = useApi("signals", api.getSignals, { revalidate: true });
   const [filter, setFilter] = useState<DocumentFilter>("all");
   const [dragging, setDragging] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const uploadLock = useRef(false);
+  const [uploaded, setUploaded] = useState<Document[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [runs, setRuns] = useState<Record<string, AnalysisRun>>({});
   const refetchSignals = signals.refetch;
+  const refetchDocuments = documents.refetch;
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const all = documents.data ?? [];
+  const all = [...uploaded.filter((doc) => !documents.data?.some((item) => item.id === doc.id)), ...(documents.data ?? [])];
   const visible = all.filter((doc) => matchesDocumentFilter(doc.document_type, filter));
   const count = (key: DocumentFilter) => all.filter((doc) => matchesDocumentFilter(doc.document_type, key)).length;
   const totalSignals = all.reduce((sum, doc) => sum + doc.related_signal_ids.length, 0);
@@ -67,6 +72,7 @@ export function DocumentsView() {
         invalidateApiCache("recommendations");
         setRuns((prev) => ({ ...prev, [documentId]: { status: "success", response } }));
         refetchSignals();
+        refetchDocuments();
       } catch (error) {
         setRuns((prev) => ({
           ...prev,
@@ -74,7 +80,7 @@ export function DocumentsView() {
         }));
       }
     },
-    [refetchSignals],
+    [refetchSignals, refetchDocuments],
   );
 
   useEffect(() => {
@@ -82,12 +88,46 @@ export function DocumentsView() {
   }, [selectedId]);
 
   const handleFiles = (files: FileList | null) => {
-    const names = Array.from(files ?? []).map((file) => file.name);
-    setNotice(
-      names.length
-        ? `Received ${names.join(", ")}. Upload ingestion is not part of this milestone, so nothing was stored. Select the Metro Foods notice below to run extraction on a real document.`
-        : "Upload ingestion is not part of this milestone. Documents shown below come from the deterministic fixture.",
-    );
+    if (uploadLock.current) return;
+    setFile(null);
+    if (!files?.length) return;
+    if (files.length !== 1) {
+      setNotice("Choose one file at a time.");
+      return;
+    }
+    const next = files[0];
+    if (!/\.(pdf|txt)$/i.test(next.name)) {
+      setNotice("Only PDF or TXT files are supported.");
+      return;
+    }
+    if (next.size === 0 || next.size > 10 * 1024 * 1024) {
+      setNotice(next.size === 0 ? "The file is empty." : "File exceeds the 10 MB limit.");
+      return;
+    }
+    setFile(next);
+    setNotice(`Selected local file: ${next.name}. Ready to upload.`);
+  };
+
+  const upload = async () => {
+    if (!file || uploadLock.current) return;
+    uploadLock.current = true;
+    setUploading(true);
+    setNotice(`Uploading ${file.name} → processing document text…`);
+    try {
+      const document = await api.uploadDocument(file);
+      setUploaded((previous) => [document, ...previous]);
+      invalidateApiCache("documents");
+      documents.refetch();
+      setSelectedId(document.id);
+      setFilter("all");
+      setFile(null);
+      setNotice(`${document.filename} uploaded → text extracted. Select Analyze document below to discover a signal using the configured Nemotron/fixture provider.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Upload failed. Try again.");
+    } finally {
+      uploadLock.current = false;
+      setUploading(false);
+    }
   };
 
   const onDrop = (event: DragEvent<HTMLDivElement>) => {
@@ -113,7 +153,8 @@ export function DocumentsView() {
         type="file"
         className="sr-only"
         aria-label="Upload document"
-        multiple
+        accept=".pdf,.txt,application/pdf,text/plain"
+        disabled={uploading}
         onChange={(event) => {
           handleFiles(event.target.files);
           event.target.value = "";
@@ -146,9 +187,9 @@ export function DocumentsView() {
           <UploadCloud className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[13.5px] font-semibold text-ink">Drop invoices, contracts, statements, or notices here</p>
+          <p className="text-[13.5px] font-semibold text-ink">Upload a business document</p>
           <p className="text-[12px] text-muted">
-            Runway turns documents into structured financial signals with traceable evidence.
+            Drop a file here or choose a file. PDF or TXT, up to 10 MB. One file at a time.
           </p>
         </div>
         <span className="hidden items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-ink-soft sm:inline-flex">
@@ -157,6 +198,14 @@ export function DocumentsView() {
         </span>
       </div>
 
+      {file ? (
+        <div className="mb-4 flex items-center gap-3">
+          <span className="text-sm text-ink-soft">{file.name}</span>
+          <Button disabled={uploading} onClick={() => void upload()}>
+            {uploading ? "Uploading · processing…" : "Upload selected file"}
+          </Button>
+        </div>
+      ) : null}
       {notice ? (
         <div role="status" className="mb-4 rounded-xl border border-info-100 bg-info-50 px-4 py-3 text-[12.5px] text-ink-soft">
           {notice}

@@ -71,6 +71,8 @@ export interface Signal {
   evidence: SignalEvidence[];
   source_document_id: string;
   extraction?: ExtractionProvenance | null;
+  disposition?: "baseline" | "proposed" | "duplicate";
+  duplicate_of_signal_id?: string | null;
 }
 
 export interface Document {
@@ -81,7 +83,7 @@ export interface Document {
   mime_type: string;
   document_date: string;
   ingested_at: string;
-  source: "fixture";
+  source: "fixture" | "upload";
   summary: string;
   checksum_sha256: string;
   related_signal_ids: string[];
@@ -138,7 +140,8 @@ export interface SupplierFacts {
   source_document_id: string;
   entity: string;
   percentage: number;
-  monthly_increase_usd: number;
+  monthly_increase_usd: number | null;
+  weekly_spend_usd?: number | null;
   effective_date: string | null;
   confidence: number;
   excerpt: string;
@@ -156,7 +159,7 @@ export interface ExtractionProvenance {
 export interface ExtractionResponse {
   signal: Signal;
   financial_state: FinancialState;
-  application_status: "already_in_baseline";
+  application_status: "already_in_baseline" | "proposed" | "potential_duplicate";
 }
 
 export type VoiceLanguage = "en" | "es" | "fr" | "hi" | "ar";

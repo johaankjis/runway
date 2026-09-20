@@ -48,6 +48,7 @@ export interface RunwayApi {
   getSignals(): Promise<Signal[]>;
   getSignal(id: string): Promise<Signal>;
   getDocuments(): Promise<Document[]>;
+  uploadDocument(file: File): Promise<Document>;
   getRecommendations(): Promise<Recommendation[]>;
   runScenario(request: ScenarioRequest): Promise<ScenarioResult>;
   resetDemo(): Promise<ResetResponse>;
@@ -149,6 +150,11 @@ export const liveApi: RunwayApi = {
   getSignals: () => request<Signal[]>("/api/signals"),
   getSignal: (id) => request<Signal>(`/api/signals/${encodeURIComponent(id)}`),
   getDocuments: () => request<Document[]>("/api/documents"),
+  uploadDocument: (file) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request<Document>("/api/documents/upload", { method: "POST", body });
+  },
   getRecommendations: () => request<Recommendation[]>("/api/recommendations"),
   runScenario: (payload) =>
     request<ScenarioResult>("/api/scenarios", {
@@ -208,6 +214,7 @@ export const api: RunwayApi = {
   getFinancialState: withFallback(liveApi.getFinancialState, fixtureApi.getFinancialState),
   getSignals: withFallback(liveApi.getSignals, fixtureApi.getSignals),
   getSignal: withFallback(liveApi.getSignal, fixtureApi.getSignal),
+  uploadDocument: withFallback(liveApi.uploadDocument, fixtureApi.uploadDocument),
   getDocuments: withFallback(liveApi.getDocuments, fixtureApi.getDocuments),
   getRecommendations: withFallback(liveApi.getRecommendations, fixtureApi.getRecommendations),
   runScenario: withFallback(liveApi.runScenario, fixtureApi.runScenario),

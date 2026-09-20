@@ -1,0 +1,14 @@
+FICTIONAL SYNTHETIC DEMO DOCUMENT - NOT A REAL VENDOR NOTICE
+
+FreshFields Produce - Delivery Surcharge Notice
+Supplier: FreshFields Produce
+Customer: Maya's Catering (fictional demo business)
+Notice date: September 20, 2026
+Effective date: October 1, 2026
+Current weekly spend: $1,850
+New delivery surcharge: 7%
+
+The delivery surcharge applies to the current weekly spend starting on the
+stated effective date. Weekly purchasing volume is assumed unchanged.
+This notice states source inputs only; it does not estimate a monthly impact.
+All names and amounts are fictional and supplied for the Runway demo.

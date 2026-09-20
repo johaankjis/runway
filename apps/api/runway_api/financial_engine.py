@@ -12,6 +12,7 @@ from runway_api.models import (
     ScenarioRequest,
     ScenarioResult,
     ScenarioSnapshot,
+    SupplierFacts,
 )
 
 
@@ -129,3 +130,18 @@ def _snapshot(state: FinancialState) -> ScenarioSnapshot:
         average_daily_net_burn_cents=state.average_daily_net_burn_cents,
         cash_runway_days=state.cash_runway_days,
     )
+
+
+def supplier_monthly_impact_cents(facts: SupplierFacts) -> int:
+    """Estimate the proposed effect only; never mutate the financial state."""
+    if facts.weekly_spend_usd is not None:
+        dollars = (
+            Decimal(str(facts.weekly_spend_usd))
+            * Decimal(str(facts.percentage))
+            / Decimal(100)
+            * Decimal(52)
+            / Decimal(12)
+        )
+    else:
+        dollars = Decimal(str(facts.monthly_increase_usd))
+    return int((dollars * 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))

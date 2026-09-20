@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
 from threading import RLock
+from uuid import uuid4
 
 from runway_api.financial_engine import calculate_financial_state
 from runway_api.models import (
@@ -32,6 +34,7 @@ class InMemoryRepository:
         _validate_fixture_references(fixture)
         state = calculate_financial_state(fixture.business.id, fixture.financial_state_input)
         with self._lock:
+            self._uploaded_text: dict[str, str] = {}
             self._business = fixture.business.model_copy(deep=True)
             self._financial_state = state.model_copy(deep=True)
             self._signals = {item.id: item.model_copy(deep=True) for item in fixture.signals}
@@ -58,6 +61,82 @@ class InMemoryRepository:
     def list_documents(self) -> list[Document]:
         with self._lock:
             return [item.model_copy(deep=True) for item in self._documents]
+
+    def add_upload(self, filename: str, mime_type: str, content: str, checksum: str) -> Document:
+        now = datetime.now(UTC)
+        document = Document(
+            id=f"upload-{uuid4()}",
+            title=filename,
+            document_type="uploaded_document",
+            filename=filename,
+            mime_type=mime_type,
+            document_date=now.date(),
+            ingested_at=now,
+            source="upload",
+            summary="Uploaded and parsed. Analyze to discover a proposed signal.",
+            checksum_sha256=checksum,
+            related_signal_ids=[],
+        )
+        with self._lock:
+            if len(self._uploaded_text) >= 100:
+                raise ValueError("Demo session holds 100 uploads. Reset the demo to clear them.")
+            self._documents.append(document)
+            self._uploaded_text[document.id] = content
+        return document.model_copy(deep=True)
+
+    def get_uploaded_text(self, document_id: str) -> str:
+        with self._lock:
+            if document_id not in self._uploaded_text:
+                raise ValueError("Upload no longer exists; upload again after reset")
+            return self._uploaded_text[document_id]
+
+    def save_uploaded_signal(self, signal: Signal) -> Signal:
+        """Persist a discovery once, atomically; never write financial state or baseline signals."""
+        validated = Signal.model_validate(signal.model_dump())
+        with self._lock:
+            if validated.source_document_id not in self._uploaded_text:
+                raise ValueError("Upload no longer exists; upload it again after demo reset")
+            if validated.id in self._signals:
+                return self._signals[validated.id].model_copy(deep=True)
+            facts = validated.extraction.attributes
+            for existing in self._signals.values():
+                if existing.disposition == "duplicate":
+                    continue
+                other = existing.extraction.attributes if existing.extraction else None
+                # Canonical Metro notice already contributes to the seeded forecast.
+                baseline_match = (
+                    existing.id == "signal-supplier-increase"
+                    and facts.entity.casefold().strip() == "metro foods"
+                    and facts.percentage == 18
+                    and facts.monthly_increase_usd == 2140
+                    and str(facts.effective_date) == "2026-09-15"
+                )
+                fact_match = other and (
+                    facts.entity.casefold().strip(),
+                    facts.percentage,
+                    facts.effective_date,
+                    facts.monthly_increase_usd,
+                    facts.weekly_spend_usd,
+                ) == (
+                    other.entity.casefold().strip(),
+                    other.percentage,
+                    other.effective_date,
+                    other.monthly_increase_usd,
+                    other.weekly_spend_usd,
+                )
+                if baseline_match or fact_match:
+                    validated.disposition = "duplicate"
+                    validated.duplicate_of_signal_id = existing.id
+                    validated.financial_effect.description += (
+                        " Potential duplicate — a matching signal already exists."
+                        " Not applied again."
+                    )
+                    break
+            self._signals[validated.id] = validated.model_copy(deep=True)
+            for document in self._documents:
+                if document.id == validated.source_document_id:
+                    document.related_signal_ids = [validated.id]
+            return validated.model_copy(deep=True)
 
     def save_signal(self, signal: Signal) -> None:
         validated = Signal.model_validate(signal.model_dump())

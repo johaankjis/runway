@@ -8,13 +8,16 @@ Identify the supplier pricing increase, entity, percentage, explicit monthly inc
 effective date and confidence. Copy the stated dollar value; do not derive it from a percentage.
 Return one JSON object matching the supplied schema, with no markdown or additional text.
 Output the final JSON directly. Do not output analysis, a thinking process, or explanations.
-The object must contain exactly these eight fields:
+The object must contain these fields (use null for the unused amount basis):
 - type: the literal string "supplier_pricing_increase".
 - source_document_id: copy the supplied source_document_id exactly.
 - entity: the supplier issuing the pricing notice, not the customer/account receiving it.
 - percentage: a JSON number in percentage points (18% means 18, not 0.18 or "18%").
 - monthly_increase_usd: the explicitly stated monthly dollar increase as a JSON number,
-  without a currency symbol or thousands separator; not cents and not a calculated amount.
+  or null when only weekly spend is stated; without a currency symbol or thousands separator;
+  not cents and not a calculated amount.
+- weekly_spend_usd: explicitly stated current weekly spend in USD, or null. When this is
+  present, monthly_increase_usd must be null. Never calculate the monthly increase.
 - effective_date: the stated date as "YYYY-MM-DD", or null only if no date is stated.
 - confidence: a JSON number between 0 and 1, not a percentage or a string.
 - excerpt: copy the entire supplied document string exactly, including markdown, spaces,

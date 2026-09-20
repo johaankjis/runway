@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import os
+from hashlib import sha256
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import UploadFile
 
 from runway_api.extraction import extract_document
 from runway_api.financial_engine import calculate_scenario
@@ -22,6 +25,7 @@ from runway_api.models import (
 )
 from runway_api.provider_config import ProviderSettings
 from runway_api.repository import InMemoryRepository
+from runway_api.uploads import MAX_FILE_BYTES, UploadValidationError, parse_upload
 from runway_api.voice import create_briefing
 
 
@@ -85,6 +89,51 @@ def create_app(
     @application.get("/api/documents", response_model=list[Document], tags=["documents"])
     def documents(repo: RepositoryDependency) -> list[Document]:
         return repo.list_documents()
+
+    @application.post(
+        "/api/documents/upload",
+        response_model=Document,
+        status_code=201,
+        tags=["documents"],
+        openapi_extra={
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "multipart/form-data": {
+                        "schema": {
+                            "type": "object",
+                            "required": ["file"],
+                            "properties": {"file": {"type": "string", "format": "binary"}},
+                        }
+                    }
+                },
+            }
+        },
+    )
+    async def upload_document(request: Request, repo: RepositoryDependency) -> Document:
+        # Bound the entire multipart body before the multipart parser can spool it.
+        body = bytearray()
+        async for chunk in request.stream():
+            body.extend(chunk)
+            if len(body) > MAX_FILE_BYTES + 64 * 1024:
+                raise HTTPException(status_code=413, detail="File exceeds the 10 MB limit.")
+        request._body = bytes(body)
+        async with request.form(max_files=1, max_fields=0) as form:
+            file = form.get("file")
+            if len(form.multi_items()) != 1 or not isinstance(file, UploadFile):
+                raise HTTPException(
+                    status_code=422, detail="Upload exactly one file using the file field."
+                )
+            raw = await file.read(MAX_FILE_BYTES + 1)
+            try:
+                name, mime, content = await run_in_threadpool(
+                    parse_upload, file.filename or "", file.content_type or "", raw
+                )
+                return repo.add_upload(name, mime, content, sha256(raw).hexdigest())
+            except UploadValidationError as error:
+                raise HTTPException(status_code=error.status_code, detail=str(error)) from error
+            except ValueError as error:
+                raise HTTPException(status_code=422, detail=str(error)) from error
 
     @application.post(
         "/api/documents/{document_id}/extract",

@@ -86,6 +86,9 @@ export const fixtureApi: RunwayApi = {
     }
     return clone(signal);
   },
+  async uploadDocument() {
+    throw new FixtureProviderUnavailableError("Document upload");
+  },
   async getDocuments() {
     await delay();
     return clone(data.documents);

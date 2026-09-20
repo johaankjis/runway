@@ -15,7 +15,9 @@ from runway_api.models import (
 class ExtractionResponse(StrictModel):
     signal: Signal
     financial_state: FinancialState
-    application_status: Literal["already_in_baseline"] = "already_in_baseline"
+    application_status: Literal["already_in_baseline", "proposed", "potential_duplicate"] = (
+        "already_in_baseline"
+    )
 
 
 VoiceLanguage = Literal["en", "es", "fr", "hi", "ar"]

@@ -32,7 +32,7 @@ import {
   formatPercent,
   formatUsd,
 } from "@/lib/format";
-import { cleanExcerpt, effectHeadline, labelForDocumentType } from "@/lib/presentation";
+import { effectHeadline, labelForDocumentType } from "@/lib/presentation";
 
 export type AnalysisRun =
   | { status: "idle" }
@@ -67,7 +67,7 @@ function describeError(error: Error): { title: string; message: string; tone: "d
     return {
       title: "This document type can't be analyzed yet",
       message:
-        "Extraction currently supports supplier pricing notices with verifiable evidence. This document's signals come from the deterministic fixture.",
+        "The source could not be verified. Supported notices state supplier, weekly spend, surcharge, and effective date explicitly. Try the FreshFields demo document.",
       tone: "info",
     };
   }
@@ -113,8 +113,8 @@ function ExtractedSignalSummary({ signal, financialState }: { signal: Signal; fi
           />
           <Fact
             icon={<TrendingUp className="h-3.5 w-3.5" />}
-            label="Stated monthly impact"
-            value={`${formatUsd(facts.monthly_increase_usd)} per month`}
+            label={facts.weekly_spend_usd != null ? "Stated weekly spend" : "Stated monthly impact"}
+            value={facts.weekly_spend_usd != null ? `${formatUsd(facts.weekly_spend_usd)} per week` : `${formatUsd(facts.monthly_increase_usd ?? 0)} per month`}
           />
           <Fact
             icon={<CalendarDays className="h-3.5 w-3.5" />}
@@ -141,8 +141,8 @@ function ExtractedSignalSummary({ signal, financialState }: { signal: Signal; fi
             <li key={item.id} className="rounded-lg border border-line bg-white p-3">
               <p className="flex items-start gap-2 text-[13px] leading-relaxed text-ink">
                 <Quote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-info-500" aria-hidden />
-                <span className="whitespace-pre-line">
-                  “<mark className="rounded bg-warning-100 px-0.5 text-ink">{cleanExcerpt(item.excerpt)}</mark>”
+                <span className="whitespace-pre-wrap">
+                  “<mark className="rounded bg-warning-100 px-0.5 text-ink">{item.excerpt}</mark>”
                 </span>
               </p>
               <p className="mt-1.5 pl-5 text-[11.5px] text-muted">
@@ -158,12 +158,11 @@ function ExtractedSignalSummary({ signal, financialState }: { signal: Signal; fi
         <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           {headline ? <span className="tabular text-[22px] font-bold tracking-tight text-ink">{headline}</span> : null}
           <Pill tone="danger" dot>
-            Already in baseline
+            {signal.disposition === "duplicate" ? "Potential duplicate" : signal.disposition === "proposed" ? "Proposed · not applied" : "Already in baseline"}
           </Pill>
         </div>
         <p className="mt-2 text-[12.5px] leading-relaxed text-ink-soft">
-          The deterministic engine already includes this increase in the forecast. Extraction attaches provenance to
-          the existing signal; it does not apply the cost a second time.
+          {effect.description}
         </p>
         {financialState ? (
           <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -244,7 +243,7 @@ export function DocumentAnalysisPanel({
               )
             }
           >
-            {analyzing ? "Analyzing…" : analyzed ? "Re-analyze document" : canAnalyze ? "Analyze document" : "Analyze document"}
+            {analyzing ? "Analyzing…" : analyzed ? (document.source === "upload" ? "View saved analysis" : "Re-analyze document") : canAnalyze ? "Analyze document" : "Analyze document"}
           </Button>
         </div>
       </div>
@@ -256,7 +255,7 @@ export function DocumentAnalysisPanel({
             Analyzing {document.filename}
           </p>
           <p className="mt-1 text-[12.5px] text-ink-soft">
-            Reading the source, extracting a structured signal, and verifying every fact against the document text before
+            Requesting the configured extraction provider (Nemotron in live mode), extracting a structured signal, and verifying every fact against the document text before
             anything is stored.
           </p>
           <div className="mt-3 space-y-2" aria-hidden>
