@@ -66,6 +66,7 @@ See [the architecture](docs/architecture.md) for calculation invariants and
 
 ## Scope
 
-This repository intentionally stops at Milestone 1. It does not include NVIDIA Nemotron,
-ElevenLabs, authentication, a database, queues, external integrations, cloud infrastructure, or
-deployment configuration.
+The AI/provider milestone adds validated NVIDIA Nemotron supplier extraction and grounded
+ElevenLabs briefings, both with credential-free fixture modes. See the
+[integration guide](docs/ai_integration_plan.md) for setup, fallback behavior, API contracts,
+and the exact demo path. Authentication, databases, queues, and deployment remain out of scope.

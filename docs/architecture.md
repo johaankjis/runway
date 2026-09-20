@@ -1,5 +1,9 @@
 # Runway Milestone 1 architecture
 
+This document records the deterministic foundation. The subsequent
+[AI/provider integration guide](ai_integration_plan.md) describes the extraction and voice
+extensions and supersedes the historical integration omissions below.
+
 Runway's first milestone is a small, local, deterministic system. FastAPI exposes a fixture-backed
 financial snapshot and traceable risk signals; Next.js supplies only the application shell.
 
@@ -66,4 +70,3 @@ explain engine output, but it must not produce authoritative financial totals.
 Milestone 1 has no database, authentication, background queue, cloud deployment, external
 integration, Nemotron, or ElevenLabs dependency. Those additions require a later milestone and
 must preserve the calculation boundary above.
-

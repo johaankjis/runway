@@ -6,7 +6,9 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 
+from runway_api.extraction import extract_document
 from runway_api.financial_engine import calculate_scenario
+from runway_api.integration_models import ExtractionResponse, VoiceRequest, VoiceResponse
 from runway_api.models import (
     Business,
     Document,
@@ -18,7 +20,9 @@ from runway_api.models import (
     ScenarioResult,
     Signal,
 )
+from runway_api.provider_config import ProviderSettings
 from runway_api.repository import InMemoryRepository
+from runway_api.voice import create_briefing
 
 
 def get_repository(request: Request) -> InMemoryRepository:
@@ -28,7 +32,11 @@ def get_repository(request: Request) -> InMemoryRepository:
 RepositoryDependency = Annotated[InMemoryRepository, Depends(get_repository)]
 
 
-def create_app(repository: InMemoryRepository | None = None) -> FastAPI:
+def create_app(
+    repository: InMemoryRepository | None = None,
+    settings: ProviderSettings | None = None,
+) -> FastAPI:
+    provider_settings = settings or ProviderSettings.from_environment()
     application = FastAPI(
         title="Runway API",
         version="0.1.0",
@@ -77,6 +85,32 @@ def create_app(repository: InMemoryRepository | None = None) -> FastAPI:
     @application.get("/api/documents", response_model=list[Document], tags=["documents"])
     def documents(repo: RepositoryDependency) -> list[Document]:
         return repo.list_documents()
+
+    @application.post(
+        "/api/documents/{document_id}/extract",
+        response_model=ExtractionResponse,
+        tags=["documents"],
+    )
+    def extract(document_id: str, repo: RepositoryDependency) -> ExtractionResponse:
+        document = next((item for item in repo.list_documents() if item.id == document_id), None)
+        if document is None:
+            raise HTTPException(status_code=404, detail="Document not found")
+        try:
+            return extract_document(repo, document, provider_settings)
+        except (ValueError, OSError) as error:
+            raise HTTPException(
+                status_code=422, detail="Document unsupported or unverifiable"
+            ) from error
+
+    @application.post("/api/voice/briefing", response_model=VoiceResponse, tags=["voice"])
+    def voice_briefing(
+        repo: RepositoryDependency,
+        payload: VoiceRequest | None = None,
+    ) -> VoiceResponse:
+        try:
+            return create_briefing(repo, payload or VoiceRequest(), provider_settings)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
 
     @application.get(
         "/api/recommendations", response_model=list[Recommendation], tags=["recommendations"]

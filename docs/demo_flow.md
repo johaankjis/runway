@@ -1,5 +1,8 @@
 # Milestone 1 demo flow
 
+For supplier extraction and voice, continue with the
+[AI/provider demo path](ai_integration_plan.md#exact-frontend-contract-and-demo-path).
+
 1. Start the API and web app using the commands in the repository README.
 2. Open `GET /api/business` to establish Maya's Catering Co. as the demo business.
 3. Open `GET /api/financial-state` and call out the calculated baseline:
@@ -26,4 +29,3 @@
 8. Call `POST /api/demo/reset` to restore the initial fixture before the next demo.
 
 The API's interactive OpenAPI UI is available at `http://localhost:8000/docs`.
-
