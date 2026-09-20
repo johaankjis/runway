@@ -85,7 +85,7 @@ export function DocumentRow({
         selected ? "bg-info-50/70 hover:bg-info-50" : "hover:bg-slate-50",
       )}
     >
-      <td className="px-4 py-3">
+      <td className="px-5 py-3">
         <button
           type="button"
           onClick={(event) => {
@@ -99,14 +99,14 @@ export function DocumentRow({
           <span
             aria-hidden
             className={cn(
-              "grid h-8 w-8 shrink-0 place-items-center rounded-lg",
-              selected ? "bg-info-100 text-info-600" : "bg-slate-100 text-ink-soft",
+              "grid h-9 w-9 shrink-0 place-items-center rounded-lg ring-1",
+              selected ? "bg-info-50 text-info-600 ring-info-100" : "bg-slate-50 text-ink-soft ring-line",
             )}
           >
             <FileText className="h-4 w-4" />
           </span>
           <span className="min-w-0">
-            <span className="block truncate text-[13px] font-semibold text-ink">{document.title}</span>
+            <span className="block truncate text-[13.5px] font-semibold text-ink">{document.title}</span>
             <span className="block truncate text-[11.5px] text-muted">{document.filename}</span>
           </span>
         </button>

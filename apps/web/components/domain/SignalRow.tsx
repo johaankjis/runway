@@ -28,24 +28,30 @@ export function SignalRow({
       <Link
         href={`/signals/${signal.id}`}
         className={cn(
-          "group flex items-center gap-4 border-b border-line px-4 transition-colors last:border-b-0 hover:bg-slate-50",
-          dense ? "py-3" : "py-3.5",
+          "group flex items-center gap-4 border-b border-line transition-colors last:border-b-0 hover:bg-slate-50",
+          dense ? "px-4 py-3" : "px-5 py-3.5",
           highlighted && "bg-danger-50/60 hover:bg-danger-50",
         )}
       >
-        <SignalIcon signal={signal} tone={impactTone[signal.impact_level]} />
+        <SignalIcon signal={signal} tone={impactTone[signal.impact_level]} size={dense ? "md" : "lg"} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13.5px] font-semibold text-ink">{signal.title}</p>
-          <p className="mt-0.5 truncate text-[12px] text-muted">
-            {!dense && <span className="text-ink-soft">{signal.description} · </span>}
-            {sourceLabel ?? signal.source_document_id} · {formatDate(signal.detected_at)}
-            {!dense && signal.confidence < 1 ? ` · ${formatConfidence(signal.confidence)} confidence` : ""}
+          <p className={cn("truncate font-semibold text-ink", dense ? "text-[13.5px]" : "text-[14.5px]")}>{signal.title}</p>
+          <p className="mt-0.5 truncate text-[12.5px] text-muted">
+            {sourceLabel ?? signal.source_document_id}
+            <span className="mx-1.5 text-muted-light">•</span>
+            {formatDate(signal.detected_at)}
+            {!dense && signal.confidence < 1 ? (
+              <>
+                <span className="mx-1.5 text-muted-light">•</span>
+                {formatConfidence(signal.confidence)} confidence
+              </>
+            ) : null}
           </p>
         </div>
         {headline ? (
-          <span className="tabular hidden text-[12.5px] font-semibold text-ink-soft md:block">{headline}</span>
+          <span className="tabular hidden text-[13px] font-semibold text-ink-soft md:block">{headline}</span>
         ) : null}
-        <ImpactBadge level={signal.impact_level} />
+        <ImpactBadge level={signal.impact_level} className={dense ? undefined : "px-3 py-1"} />
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-light transition-transform group-hover:translate-x-0.5" aria-hidden />
       </Link>
     </li>

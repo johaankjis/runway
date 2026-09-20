@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownRight, ArrowRight, Info, RefreshCw } from "lucide-react";
+import { ArrowDownRight, ArrowRight, Info, RefreshCw, Sparkles } from "lucide-react";
 import { useState } from "react";
 
 import { CashPositionChart } from "@/components/charts/CashPositionChart";
@@ -55,13 +55,16 @@ export function HomeView() {
 
   const latest = state.data?.forecast_adjustments?.at(-1);
   const exactMoney = (cents: number) => (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+  const signedExact = (cents: number) => `${cents < 0 ? "-" : "+"}${exactMoney(Math.abs(cents))}`;
 
   const horizon = state.data ? Math.max(daysBetween(state.data.as_of, state.data.forecast_end_date), (state.data.cash_runway_days ?? 0) + 2) : 30;
+  const windowDays = state.data ? daysBetween(state.data.as_of, state.data.forecast_end_date) : null;
 
   return (
     <div className="animate-fade-in space-y-6">
       <PageHeader
-        title={business.data ? `Good morning, ${business.data.owner_name.split(" ")[0]}` : "Overview"}
+        className="mb-0"
+        title={business.data ? `Good morning, ${business.data.owner_name.split(" ")[0]}` : "Home"}
         subtitle={
           state.data
             ? `${business.data?.name ?? "Your business"} · cash position as of ${formatDate(state.data.as_of)}`
@@ -81,15 +84,25 @@ export function HomeView() {
       />
 
       {latest ? (
-        <Card className="border-info-100 bg-info-50/60" aria-live="polite">
-          <p className="text-xs font-bold uppercase tracking-widest text-info-600">Forecast updated</p>
-          <p className="mt-1 font-semibold text-ink">{latest.entity} surcharge incorporated</p>
-          <p className="mt-1 text-sm text-ink-soft">+{exactMoney(latest.monthly_amount_cents)}/month · +{exactMoney(latest.amount_cents)} in this forecast</p>
-          <p className="mt-1 text-xs text-muted">Effective {formatDate(latest.effective_date)} · Source: {latest.source_filename} · Updated {formatDateTime(latest.applied_at)}</p>
-          <details className="mt-2 text-xs text-ink-soft">
-            <summary className="cursor-pointer">How this was calculated</summary>
-            <p className="mt-2">{latest.calculation_explanation}</p>
-          </details>
+        <Card tone="info" className="flex items-start gap-3.5 px-5 py-4" aria-live="polite">
+          <span aria-hidden className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-info-100 text-info-600">
+            <Sparkles className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-info-600">Forecast updated</p>
+            <p className="mt-0.5 text-[14px] font-semibold text-ink">
+              {latest.entity} surcharge incorporated ·{" "}
+              <span className="tabular">{signedExact(latest.monthly_amount_cents)}/month</span> ·{" "}
+              <span className="tabular">{signedExact(latest.amount_cents)} in this forecast</span>
+            </p>
+            <p className="mt-1 text-[12px] text-muted">
+              Effective {formatDate(latest.effective_date)} · Source {latest.source_filename} · Updated {formatDateTime(latest.applied_at)}
+            </p>
+            <details className="mt-1.5 text-[12px] text-ink-soft">
+              <summary className="cursor-pointer font-medium text-info-600">How this was calculated</summary>
+              <p className="mt-1.5 leading-relaxed">{latest.calculation_explanation}</p>
+            </details>
+          </div>
         </Card>
       ) : null}
 
@@ -105,12 +118,12 @@ export function HomeView() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.15fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.2fr]">
         <Card>
           <CardHeader
             title={
               <span className="inline-flex items-center gap-1.5">
-                Forecast · Cash Runway
+                Cash Runway
                 <Info className="h-3.5 w-3.5 text-muted-light" aria-label="Days until cash reaches zero at the current burn rate" />
               </span>
             }
@@ -118,14 +131,14 @@ export function HomeView() {
           />
           {state.data ? (
             <>
-              <p className="tabular text-[34px] font-bold leading-none tracking-tight text-ink">
+              <p className="tabular text-[36px] font-bold leading-none tracking-tight text-ink">
                 {state.data.cash_runway_days != null ? `${state.data.cash_runway_days} days` : "No net burn"}
               </p>
-              <p className="mt-2 flex items-center gap-1 text-[12.5px] font-medium text-danger-600">
+              <p className="mt-2.5 flex items-center gap-1 text-[13px] font-medium text-danger-600">
                 <ArrowDownRight className="h-3.5 w-3.5" aria-hidden />
                 {formatCents(state.data.average_daily_net_burn_cents)} average daily net burn
               </p>
-              <div className="mt-4">
+              <div className="mt-5">
                 <RunwayChart
                   currentCashCents={state.data.current_cash_cents}
                   dailyBurnCents={state.data.average_daily_net_burn_cents}
@@ -134,7 +147,7 @@ export function HomeView() {
                   shortfallCents={state.data.projected_shortfall_cents}
                   startDate={state.data.as_of}
                   horizonDays={horizon}
-                  height={190}
+                  height={200}
                 />
               </div>
             </>
@@ -142,15 +155,20 @@ export function HomeView() {
             <div className="space-y-3">
               <Skeleton className="h-9 w-32" />
               <Skeleton className="h-4 w-48" />
-              <Skeleton className="h-[190px] w-full" />
+              <Skeleton className="h-[200px] w-full" />
             </div>
           )}
         </Card>
 
         <Card>
           <CardHeader
-            title="Cash Position"
-            subtitle={state.data ? `Next ${daysBetween(state.data.as_of, state.data.forecast_end_date)} days · through ${formatDate(state.data.forecast_end_date)}` : undefined}
+            title={
+              <span className="inline-flex items-center gap-1.5">
+                Cash Position{windowDays != null ? ` (Next ${windowDays} Days)` : ""}
+                <Info className="h-3.5 w-3.5 text-muted-light" aria-label="Scheduled inflows and outflows through the end of the forecast window" />
+              </span>
+            }
+            subtitle={state.data ? `Forecast through ${formatDate(state.data.forecast_end_date)}` : undefined}
             action={
               <Button href="/cash-flow" variant="ghost" size="sm" iconRight={<ArrowRight className="h-3.5 w-3.5" aria-hidden />}>
                 Cash flow
@@ -159,20 +177,34 @@ export function HomeView() {
           />
           {state.data ? (
             <>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                <InlineStat label="Actual · Current cash" value={exactMoney(state.data.current_cash_cents)} />
-                <InlineStat label="Forecast · Expected inflows" value={exactMoney(state.data.expected_inflows_cents)} tone="success" />
-                <InlineStat label="Forecast · Expected outflows" value={exactMoney(state.data.expected_outflows_cents)} tone="danger" />
-                <InlineStat label="Forecast · Ending cash" value={exactMoney(state.data.projected_ending_cash_cents)} />
-                <InlineStat
-                  label={state.data.projected_shortfall_cents > 0 ? "Forecast · Shortfall" : "Forecast · Balance"}
-                  value={
-                    state.data.projected_shortfall_cents > 0
+              <div className="grid grid-cols-3 gap-4">
+                <InlineStat label="Current cash" value={exactMoney(state.data.current_cash_cents)} />
+                <InlineStat label="Expected inflows" value={signedExact(state.data.expected_inflows_cents)} tone="success" />
+                <InlineStat label="Expected outflows" value={signedExact(-state.data.expected_outflows_cents)} tone="danger" />
+              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-line pt-3.5">
+                <p className="text-[12.5px] text-muted">
+                  Projected ending cash{" "}
+                  <span className="tabular font-semibold text-ink">{exactMoney(state.data.projected_ending_cash_cents)}</span>
+                </p>
+                <p className="text-[12.5px] text-muted">
+                  Minimum reserve{" "}
+                  <span className="tabular font-semibold text-ink">{exactMoney(state.data.minimum_cash_reserve_cents)}</span>
+                </p>
+                <p className="text-[12.5px] text-muted">
+                  {state.data.projected_shortfall_cents > 0 ? "Projected shortfall" : "Buffer above reserve"}{" "}
+                  <span
+                    className={
+                      state.data.projected_shortfall_cents > 0
+                        ? "tabular font-semibold text-danger-600"
+                        : "tabular font-semibold text-success-600"
+                    }
+                  >
+                    {state.data.projected_shortfall_cents > 0
                       ? exactMoney(state.data.projected_shortfall_cents)
-                      : exactMoney(state.data.projected_ending_cash_cents)
-                  }
-                  tone={state.data.projected_shortfall_cents > 0 ? "danger" : "success"}
-                />
+                      : exactMoney(state.data.projected_ending_cash_cents - state.data.minimum_cash_reserve_cents)}
+                  </span>
+                </p>
               </div>
               <div className="mt-3">
                 <CashPositionChart
@@ -181,14 +213,14 @@ export function HomeView() {
                   outflowsCents={state.data.expected_outflows_cents}
                   projectedCents={state.data.projected_ending_cash_cents}
                   reserveCents={state.data.minimum_cash_reserve_cents}
-                  height={176}
+                  height={190}
                 />
               </div>
             </>
           ) : (
             <div className="space-y-3">
               <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-[176px] w-full" />
+              <Skeleton className="h-[190px] w-full" />
             </div>
           )}
         </Card>

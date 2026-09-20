@@ -5,7 +5,6 @@ import {
   Area,
   CartesianGrid,
   ComposedChart,
-  Legend,
   Line,
   ReferenceDot,
   ReferenceLine,
@@ -18,7 +17,24 @@ import {
 import { buildCashFlowTimeline, buildRunwaySeries } from "@/lib/chart-data";
 import { daysBetween, formatCents, formatCompactCents, formatDateShort } from "@/lib/format";
 
+import { ChartCallout } from "./ChartCallout";
 import { chart, tooltipStyle } from "./chart-theme";
+
+/** Legend rendered outside the plot so it can sit in a card header. */
+export function TimelineLegend() {
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[12.5px] font-medium text-ink-soft">
+      <span className="inline-flex items-center gap-2">
+        <span aria-hidden className="inline-block h-[3px] w-5 rounded-full bg-success-600" />
+        Scheduled balance
+      </span>
+      <span className="inline-flex items-center gap-2">
+        <span aria-hidden className="inline-block w-5 border-t-2 border-dashed border-danger-500" />
+        Burn-rate trend
+      </span>
+    </div>
+  );
+}
 
 /**
  * Forecast-window balance: scheduled entries walked in date order (solid,
@@ -30,20 +46,25 @@ export function CashFlowTimelineChart({ state, height = 280 }: { state: Financia
   const trend = buildRunwaySeries(state, state.as_of, horizon);
   const data = timeline.map((point, index) => ({ ...point, trend: trend[index]?.balance ?? null }));
   const last = data[data.length - 1];
-  const ticks = data.filter((_, i) => i % 7 === 0 || i === data.length - 1).map((p) => p.date);
+  const lastIndex = data.length - 1;
+  // Weekly ticks plus the final day, skipping a weekly tick that would collide with it.
+  const ticks = data
+    .filter((_, i) => i === lastIndex || (i % 7 === 0 && lastIndex - i >= 3))
+    .map((p) => p.date);
+  const shortfall = state.projected_shortfall_cents > 0;
 
   return (
     <div style={{ height }} className="w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data} margin={{ top: 16, right: 16, left: 0, bottom: 0 }}>
+        <ComposedChart data={data} margin={{ top: 16, right: 16, left: 8, bottom: 0 }}>
           <defs>
             <linearGradient id="timelineFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={chart.green} stopOpacity={0.25} />
+              <stop offset="0%" stopColor={chart.green} stopOpacity={0.24} />
               <stop offset="100%" stopColor={chart.green} stopOpacity={0.02} />
             </linearGradient>
           </defs>
           <CartesianGrid stroke={chart.grid} vertical={false} />
-          <XAxis dataKey="date" ticks={ticks} tickFormatter={formatDateShort} axisLine={false} tickLine={false} tickMargin={8} />
+          <XAxis dataKey="date" ticks={ticks} tickFormatter={formatDateShort} axisLine={false} tickLine={false} tickMargin={10} interval={0} />
           <YAxis tickFormatter={(v: number) => formatCompactCents(v)} axisLine={false} tickLine={false} width={52} />
           <Tooltip
             contentStyle={tooltipStyle}
@@ -55,13 +76,6 @@ export function CashFlowTimelineChart({ state, height = 280 }: { state: Financia
               formatCents(value),
               name === "balance" ? "Scheduled balance" : "Burn-rate trend",
             ]}
-          />
-          <Legend
-            verticalAlign="top"
-            align="right"
-            iconType="plainline"
-            wrapperStyle={{ fontSize: 12, paddingBottom: 8 }}
-            formatter={(value: string) => (value === "balance" ? "Scheduled balance" : "Burn-rate trend")}
           />
           <ReferenceLine
             y={state.minimum_cash_reserve_cents}
@@ -91,20 +105,18 @@ export function CashFlowTimelineChart({ state, height = 280 }: { state: Financia
             <ReferenceDot
               x={last.date}
               y={last.balance}
-              r={5}
-              fill={state.projected_shortfall_cents > 0 ? chart.red : chart.green}
+              r={6}
+              fill={shortfall ? chart.red : chart.green}
               stroke="#fff"
-              strokeWidth={2}
-              label={{
-                value:
-                  state.projected_shortfall_cents > 0
-                    ? `Shortfall ${formatCents(state.projected_shortfall_cents)}`
-                    : `Ends ${formatCompactCents(last.balance)}`,
-                position: "left",
-                fill: state.projected_shortfall_cents > 0 ? chart.red : chart.green,
-                fontSize: 11,
-                fontWeight: 600,
-              }}
+              strokeWidth={2.5}
+              label={
+                <ChartCallout
+                  title={shortfall ? "Projected shortfall" : "Projected ending cash"}
+                  value={shortfall ? formatCents(state.projected_shortfall_cents) : formatCents(last.balance)}
+                  valueColor={shortfall ? chart.red : chart.green}
+                  side="left"
+                />
+              }
             />
           ) : null}
         </ComposedChart>

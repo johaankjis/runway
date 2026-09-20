@@ -4,12 +4,12 @@ import type { ScenarioRequest, ScenarioResult, ScenarioSnapshot } from "@runway/
 import { Info, Play, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-import { ScenarioComparisonChart } from "@/components/charts/ScenarioComparisonChart";
+import { ScenarioComparisonChart, ScenarioLegend } from "@/components/charts/ScenarioComparisonChart";
 import { ScenarioCard } from "@/components/domain/ScenarioCard";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
-import { Tabs } from "@/components/ui/Tabs";
+import { FilterPills } from "@/components/ui/FilterPills";
 import { ErrorState, LoadingState } from "@/components/ui/States";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
@@ -75,8 +75,8 @@ function ComparisonTable({ baseline, projected }: { baseline: ScenarioSnapshot; 
     { label: "Daily net burn", base: baseline.average_daily_net_burn_cents, next: projected.average_daily_net_burn_cents, format: formatCents, deltaFormat: formatSignedCents, invert: true },
   ];
   return (
-    <table className="w-full text-left text-[13px]">
-      <thead className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+    <table className="w-full text-left text-[13.5px]">
+      <thead className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted">
         <tr className="border-b border-line">
           <th scope="col" className="py-2 pr-3 font-semibold">Metric</th>
           <th scope="col" className="py-2 pr-3 text-right">Baseline</th>
@@ -110,52 +110,54 @@ function ScenarioResultPanel({ result, startDate, modeling }: { result: Scenario
     <div className="space-y-5">
       <Card>
         <CardHeader
-          title="Cash position impact"
+          title="Cash Position Impact"
           subtitle={`${result.name} · compared with the current projection`}
+          action={<ScenarioLegend hasScenario />}
         />
-        <ScenarioComparisonChart baseline={result.baseline} scenario={result.projected} startDate={startDate} height={250} />
+        <ScenarioComparisonChart baseline={result.baseline} scenario={result.projected} startDate={startDate} height={260} />
       </Card>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.2fr_1fr]">
+      <Card tone="info" className="flex items-start gap-3.5 px-5 py-4">
+        <span aria-hidden className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-info-100 text-info-600">
+          <Info className="h-4 w-4" />
+        </span>
+        <p className="text-[14px] leading-relaxed text-ink">
+          {runwayDelta == null ? (
+            <>In this scenario the engine reports no measurable net burn, so runway is not bounded.</>
+          ) : runwayDelta === 0 ? (
+            <>This scenario leaves cash runway unchanged at {nextRunway} days.</>
+          ) : (
+            <>
+              In this scenario, your cash runway {runwayDelta > 0 ? "increases" : "decreases"} by{" "}
+              <strong>{pluralize(Math.abs(runwayDelta), "day")}</strong> to {nextRunway} days
+              {shortfallDelta !== 0 ? (
+                <>
+                  , and the projected shortfall {shortfallDelta < 0 ? "shrinks" : "grows"} by{" "}
+                  <strong>{formatCents(Math.abs(shortfallDelta))}</strong>
+                  {result.projected.projected_shortfall_cents === 0 ? " (fully covered)" : ""}
+                </>
+              ) : null}
+              .
+            </>
+          )}
+          {modeling ? <span className="mt-1 block text-[12.5px] text-ink-soft">{modeling}</span> : null}
+        </p>
+      </Card>
+
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.25fr_1fr]">
         <Card>
-          <CardHeader title="Baseline vs. scenario" />
+          <CardHeader title="Baseline vs. scenario" subtitle="Every figure below is calculated by the deterministic engine." />
           <ComparisonTable baseline={result.baseline} projected={result.projected} />
         </Card>
-        <div className="space-y-5">
-          <Card tone="info" className="flex items-start gap-3">
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-info-600" aria-hidden />
-            <p className="text-[13px] leading-relaxed text-ink">
-              {runwayDelta == null ? (
-                <>In this scenario the engine reports no measurable net burn, so runway is not bounded.</>
-              ) : runwayDelta === 0 ? (
-                <>This scenario leaves cash runway unchanged at {nextRunway} days.</>
-              ) : (
-                <>
-                  In this scenario your cash runway {runwayDelta > 0 ? "increases" : "decreases"} by{" "}
-                  <strong>{pluralize(Math.abs(runwayDelta), "day")}</strong> to {nextRunway} days
-                  {shortfallDelta !== 0 ? (
-                    <>
-                      , and the projected shortfall {shortfallDelta < 0 ? "shrinks" : "grows"} by{" "}
-                      <strong>{formatCents(Math.abs(shortfallDelta))}</strong>
-                      {result.projected.projected_shortfall_cents === 0 ? " (fully covered)" : ""}
-                    </>
-                  ) : null}
-                  .
-                </>
-              )}
-              {modeling ? <span className="mt-1.5 block text-[12px] text-ink-soft">{modeling}</span> : null}
-            </p>
-          </Card>
-          <Card>
-            <CardHeader title="Engine assumptions" subtitle="Returned with every scenario result." />
-            <ul className="list-disc space-y-1.5 pl-4 text-[12.5px] text-ink-soft">
-              {result.assumptions.map((assumption) => (
-                <li key={assumption}>{assumption}</li>
-              ))}
-            </ul>
-            <p className="mt-3 font-mono text-[10.5px] text-muted">{result.id}</p>
-          </Card>
-        </div>
+        <Card className="self-start">
+          <CardHeader title="Engine assumptions" subtitle="Returned with every scenario result." />
+          <ul className="list-disc space-y-1.5 pl-4 text-[12.5px] text-ink-soft">
+            {result.assumptions.map((assumption) => (
+              <li key={assumption}>{assumption}</li>
+            ))}
+          </ul>
+          <p className="mt-3 font-mono text-[10.5px] text-muted">{result.id}</p>
+        </Card>
       </div>
     </div>
   );
@@ -254,12 +256,12 @@ export function ScenariosView() {
         }
       />
 
-      <Tabs
+      <FilterPills
         label="Scenario mode"
         value={tab}
         onChange={setTab}
         className="mb-5"
-        tabs={[
+        options={[
           { key: "quick", label: "Quick scenarios" },
           { key: "custom", label: "Custom scenario" },
         ]}
@@ -377,7 +379,7 @@ export function ScenariosView() {
               <ScenarioResultPanel result={customRun.result} startDate={startDate} />
             ) : (
               <Card>
-                <CardHeader title="Cash position impact" subtitle="Run a custom scenario to compare it with the current projection." />
+                <CardHeader title="Cash Position Impact" subtitle="Run a custom scenario to compare it with the current projection." action={<ScenarioLegend hasScenario={false} />} />
                 {state.data ? (
                   <ScenarioComparisonChart
                     baseline={{

@@ -33,21 +33,21 @@ export function MetricCard({
   className?: string;
 }) {
   return (
-    <Card className={cn("flex flex-col gap-1", className)}>
+    <Card className={cn("flex flex-col gap-1.5", className)}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[12.5px] font-medium text-muted">{label}</p>
+        <p className="text-[13px] font-medium text-ink-soft">{label}</p>
         {icon}
       </div>
-      <p className={cn("tabular font-bold tracking-tight", size === "lg" ? "text-[30px]" : "text-[24px]", valueTone[tone])}>
+      <p className={cn("tabular font-bold tracking-tight", size === "lg" ? "text-[30px]" : "text-[26px]", valueTone[tone])}>
         {value}
       </p>
       {delta ? (
-        <p className={cn("flex items-center gap-1 text-xs font-medium", valueTone[delta.tone])}>
+        <p className={cn("flex items-center gap-1 text-[12.5px] font-medium", valueTone[delta.tone])}>
           {delta.icon}
           {delta.text}
         </p>
       ) : null}
-      {hint ? <p className="text-[11.5px] text-muted">{hint}</p> : null}
+      {hint ? <p className="text-[12px] text-muted">{hint}</p> : null}
     </Card>
   );
 }
@@ -64,8 +64,8 @@ export function InlineStat({
 }) {
   return (
     <div className="min-w-0">
-      <p className={cn("tabular text-[20px] font-bold leading-tight tracking-tight", valueTone[tone])}>{value}</p>
-      <p className="mt-0.5 text-[11.5px] text-muted">{label}</p>
+      <p className={cn("tabular truncate text-[22px] font-bold leading-tight tracking-tight", valueTone[tone])}>{value}</p>
+      <p className="mt-1 text-[12px] text-muted">{label}</p>
     </div>
   );
 }

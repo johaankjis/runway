@@ -41,24 +41,28 @@ export function RecommendationCard({
   return (
     <article
       className={cn(
-        "flex items-start gap-4 rounded-xl border bg-white p-4 transition-shadow hover:shadow-card-hover",
-        urgent ? "border-danger-100 bg-danger-50/40" : "border-line",
+        "flex items-start gap-4 rounded-2xl border bg-white transition-shadow hover:shadow-card-hover",
+        compact ? "p-4" : "p-5",
+        urgent ? "border-danger-100 bg-danger-50/50" : "border-line",
       )}
     >
       <span
         aria-hidden
         className={cn(
-          "grid h-10 w-10 shrink-0 place-items-center rounded-lg ring-1",
-          urgent ? "bg-danger-100 text-danger-600 ring-danger-100" : "bg-slate-50 text-ink-soft ring-line",
+          "grid shrink-0 place-items-center ring-1",
+          compact ? "h-10 w-10 rounded-lg" : "h-12 w-12 rounded-xl",
+          urgent ? "bg-danger-500 text-white ring-danger-500" : "bg-slate-50 text-ink-soft ring-line",
         )}
       >
-        <Icon className="h-[18px] w-[18px]" />
+        <Icon className={compact ? "h-[18px] w-[18px]" : "h-5 w-5"} />
       </span>
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-[14px] font-semibold text-ink">{recommendation.title}</h3>
-          <Pill tone={horizonTone[horizon]}>{horizonLabel[horizon]}</Pill>
+          <h3 className={cn("font-semibold text-ink", compact ? "text-[14px]" : "text-[15px]")}>{recommendation.title}</h3>
+          <Pill tone={horizonTone[horizon]} className={compact ? undefined : "sm:hidden"}>
+            {horizonLabel[horizon]}
+          </Pill>
         </div>
         <p className="mt-1 text-[12.5px] text-ink-soft">{recommendation.description}</p>
         {!compact ? (
@@ -86,11 +90,17 @@ export function RecommendationCard({
         ) : null}
       </div>
 
-      <div className="hidden shrink-0 sm:block">
+      <div className={cn("hidden shrink-0 items-center gap-4 sm:flex", !compact && "self-center")}>
+        {!compact ? (
+          <Pill tone={horizonTone[horizon]} className="px-3 py-1">
+            {horizonLabel[horizon]}
+          </Pill>
+        ) : null}
         <Button
           href={primarySignal ? `/signals/${primarySignal.id}` : "/signals"}
           variant={urgent ? "primary" : "secondary"}
-          size="sm"
+          size={compact ? "sm" : "md"}
+          className={compact ? undefined : "min-w-[132px]"}
           iconRight={urgent ? <ArrowRight className="h-3.5 w-3.5" aria-hidden /> : undefined}
         >
           {actionLabel[horizon]}

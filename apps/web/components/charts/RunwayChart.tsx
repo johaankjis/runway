@@ -15,6 +15,7 @@ import {
 import { buildRunwaySeries } from "@/lib/chart-data";
 import { formatCents, formatCompactCents, formatDateShort } from "@/lib/format";
 
+import { ChartCallout } from "./ChartCallout";
 import { chart, tooltipStyle } from "./chart-theme";
 
 interface RunwayChartProps {
@@ -54,14 +55,15 @@ export function RunwayChart({
     .filter((v, i, arr) => arr.indexOf(v) === i)
     .map((day) => data[day]?.date)
     .filter(Boolean) as string[];
+  const calloutSide = runwayDays != null && runwayDays > horizonDays * 0.45 ? "left" : "right";
 
   return (
     <div style={{ height }} className="w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 12, right: 12, left: showAxes ? 0 : 0, bottom: 0 }}>
+        <AreaChart data={data} margin={{ top: 16, right: 4, left: 12, bottom: 0 }}>
           <defs>
             <linearGradient id="runwayFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={chart.red} stopOpacity={0.28} />
+              <stop offset="0%" stopColor={chart.red} stopOpacity={0.26} />
               <stop offset="100%" stopColor={chart.red} stopOpacity={0.02} />
             </linearGradient>
           </defs>
@@ -73,13 +75,15 @@ export function RunwayChart({
             axisLine={false}
             tickLine={false}
             hide={!showAxes}
-            tickMargin={8}
+            tickMargin={10}
+            interval={0}
           />
           <YAxis
+            orientation="right"
             tickFormatter={(v: number) => formatCompactCents(v)}
             axisLine={false}
             tickLine={false}
-            width={48}
+            width={52}
             hide={!showAxes}
             domain={[0, "dataMax"]}
           />
@@ -92,7 +96,7 @@ export function RunwayChart({
             y={reserveCents}
             stroke={chart.slate}
             strokeDasharray="4 4"
-            label={{ value: "Minimum reserve", position: "insideTopRight", fill: chart.slate, fontSize: 10 }}
+            label={{ value: "Minimum reserve", position: "insideTopLeft", fill: chart.slate, fontSize: 10 }}
           />
           <Area
             type="monotone"
@@ -109,17 +113,18 @@ export function RunwayChart({
             <ReferenceDot
               x={zeroDay.date}
               y={0}
-              r={5}
+              r={6}
               fill={chart.red}
               stroke="#fff"
-              strokeWidth={2}
-              label={{
-                value: shortfallCents > 0 ? `Shortfall ${formatCents(shortfallCents)}` : `Day ${runwayDays}`,
-                position: "top",
-                fill: chart.red,
-                fontSize: 11,
-                fontWeight: 600,
-              }}
+              strokeWidth={2.5}
+              label={
+                <ChartCallout
+                  title={shortfallCents > 0 ? "Projected shortfall" : "Cash reaches zero"}
+                  value={shortfallCents > 0 ? formatCents(shortfallCents) : `Day ${runwayDays}`}
+                  valueColor={chart.red}
+                  side={calloutSide}
+                />
+              }
             />
           ) : null}
         </AreaChart>

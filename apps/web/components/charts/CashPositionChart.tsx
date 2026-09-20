@@ -18,9 +18,9 @@ import { formatCents, formatCompactCents, formatSignedCents } from "@/lib/format
 import { chart, tooltipStyle } from "./chart-theme";
 
 const colors: Record<CashPositionBar["key"], string> = {
-  current: chart.navy,
-  inflows: chart.green,
-  outflows: chart.red,
+  current: "#2A3D62",
+  inflows: "#5FC49A",
+  outflows: "#EF6B7A",
   projected: "#64748B",
 };
 
@@ -49,7 +49,7 @@ export function CashPositionChart({
   return (
     <div style={{ height }} className="w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 18, right: 8, left: 0, bottom: 0 }} barCategoryGap="28%">
+        <BarChart data={data} margin={{ top: 18, right: 8, left: 0, bottom: 0 }} barCategoryGap="30%">
           <XAxis dataKey="label" axisLine={false} tickLine={false} tickMargin={8} />
           <YAxis
             tickFormatter={(v: number) => formatCompactCents(v)}
@@ -74,7 +74,7 @@ export function CashPositionChart({
               return [key === "inflows" || key === "outflows" ? formatSignedCents(value) : formatCents(value), (item.payload as CashPositionBar).label];
             }}
           />
-          <Bar dataKey="value" radius={[6, 6, 6, 6]} isAnimationActive={false}>
+          <Bar dataKey="value" radius={[4, 4, 4, 4]} isAnimationActive={false}>
             {data.map((entry) => (
               <Cell key={entry.key} fill={colors[entry.key]} />
             ))}
