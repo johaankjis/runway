@@ -3,13 +3,48 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  background: #07100d;
-  color: #eefbf5;
+  color-scheme: light;
+  --canvas: #f6f5f2;
+  --ink: #0f1b31;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 body {
-  min-height: 100vh;
-  margin: 0;
+  font-feature-settings: "cv11", "ss01", "tnum";
+}
+
+*:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #d5d9e2;
+  border-radius: 8px;
+}
+
+.recharts-cartesian-axis-tick text {
+  fill: #94a3b8;
+  font-size: 11px;
+}
+.recharts-tooltip-cursor {
+  stroke: #cbd5e1;
 }

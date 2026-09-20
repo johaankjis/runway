@@ -1,0 +1,459 @@
+{
+  "_note": "Captured from the live Runway API (GET/POST responses). Fixture adapter only; never edited by hand for financial values.",
+  "captured_at": "2026-09-19T00:00:00Z",
+  "business": {
+    "id": "business-maya-catering",
+    "name": "Maya's Catering Co.",
+    "industry": "Catering and events",
+    "owner_name": "Maya Patel",
+    "currency": "USD",
+    "timezone": "America/New_York"
+  },
+  "financial_state": {
+    "business_id": "business-maya-catering",
+    "as_of": "2026-09-19",
+    "forecast_end_date": "2026-10-18",
+    "current_cash_cents": 4320000,
+    "expected_inflows_cents": 1940000,
+    "expected_outflows_cents": 5170000,
+    "projected_ending_cash_cents": 1090000,
+    "minimum_cash_reserve_cents": 1570000,
+    "projected_shortfall_cents": 480000,
+    "average_daily_net_burn_cents": 240000,
+    "cash_runway_days": 18,
+    "cash_flow": [
+      {
+        "id": "cashflow-inv-1042",
+        "direction": "inflow",
+        "amount_cents": 1240000,
+        "description": "Northstar Events invoice INV-1042",
+        "expected_date": "2026-09-25",
+        "status": "overdue",
+        "source_document_id": "doc-inv-1042"
+      },
+      {
+        "id": "cashflow-wedding-deposit",
+        "direction": "inflow",
+        "amount_cents": 700000,
+        "description": "October wedding deposit",
+        "expected_date": "2026-09-24",
+        "status": "expected",
+        "source_document_id": null
+      },
+      {
+        "id": "cashflow-payroll-sep-28",
+        "direction": "outflow",
+        "amount_cents": 1840000,
+        "description": "Payroll and employer taxes",
+        "expected_date": "2026-09-28",
+        "status": "scheduled",
+        "source_document_id": "doc-payroll-calendar"
+      },
+      {
+        "id": "cashflow-suppliers",
+        "direction": "outflow",
+        "amount_cents": 1420000,
+        "description": "Food and beverage suppliers",
+        "expected_date": "2026-09-26",
+        "status": "scheduled",
+        "source_document_id": "doc-supplier-price-notice"
+      },
+      {
+        "id": "cashflow-rent",
+        "direction": "outflow",
+        "amount_cents": 680000,
+        "description": "Kitchen and office rent",
+        "expected_date": "2026-10-01",
+        "status": "scheduled",
+        "source_document_id": null
+      },
+      {
+        "id": "cashflow-utilities",
+        "direction": "outflow",
+        "amount_cents": 230000,
+        "description": "Utilities and vehicle fuel",
+        "expected_date": "2026-10-05",
+        "status": "scheduled",
+        "source_document_id": null
+      },
+      {
+        "id": "cashflow-tax-payment",
+        "direction": "outflow",
+        "amount_cents": 1000000,
+        "description": "Quarterly estimated tax payment",
+        "expected_date": "2026-10-15",
+        "status": "scheduled",
+        "source_document_id": null
+      }
+    ]
+  },
+  "signals": [
+    {
+      "id": "signal-supplier-increase",
+      "type": "supplier_pricing_increase",
+      "title": "Supplier pricing increased 18%",
+      "description": "Metro Foods raised pricing on Maya's standard ingredient basket.",
+      "category": "expenses",
+      "impact_level": "high",
+      "confidence": 0.99,
+      "detected_at": "2026-09-19T09:00:00-04:00",
+      "financial_effect": {
+        "kind": "expense_increase",
+        "amount_cents": 214000,
+        "percentage": 18.0,
+        "cadence": "monthly",
+        "calculation_status": "applied",
+        "description": "Deterministic monthly expense increase supplied by the vendor notice."
+      },
+      "evidence": [
+        {
+          "id": "evidence-supplier-increase",
+          "source_document_id": "doc-supplier-price-notice",
+          "source_type": "document",
+          "excerpt": "revised pricing is estimated to add $2,140 per month",
+          "locator": "Pricing Update, paragraph 2"
+        }
+      ],
+      "source_document_id": "doc-supplier-price-notice"
+    },
+    {
+      "id": "signal-invoice-overdue",
+      "type": "invoice_overdue",
+      "title": "Invoice INV-1042 is 17 days overdue",
+      "description": "Northstar Events has not paid the $12,400 receivable.",
+      "category": "receivables",
+      "impact_level": "critical",
+      "confidence": 1.0,
+      "detected_at": "2026-09-19T09:02:00-04:00",
+      "financial_effect": {
+        "kind": "delayed_inflow",
+        "amount_cents": 1240000,
+        "percentage": null,
+        "cadence": "one_time",
+        "calculation_status": "observed",
+        "description": "The receivable remains in expected inflows but is flagged as overdue."
+      },
+      "evidence": [
+        {
+          "id": "evidence-invoice-overdue",
+          "source_document_id": "doc-inv-1042",
+          "source_type": "document",
+          "excerpt": "unpaid and 17 days past due",
+          "locator": "Outstanding Receivable, status paragraph"
+        }
+      ],
+      "source_document_id": "doc-inv-1042"
+    },
+    {
+      "id": "signal-revenue-decline",
+      "type": "weekly_revenue_decline",
+      "title": "Weekly revenue declined 11.8%",
+      "description": "Booked revenue fell from $24,410 to $21,530 week over week.",
+      "category": "revenue",
+      "impact_level": "high",
+      "confidence": 1.0,
+      "detected_at": "2026-09-19T09:04:00-04:00",
+      "financial_effect": {
+        "kind": "revenue_decrease",
+        "amount_cents": null,
+        "percentage": 11.8,
+        "cadence": "weekly",
+        "calculation_status": "observed",
+        "description": "Historical change only; no future impact is applied without a scenario."
+      },
+      "evidence": [
+        {
+          "id": "evidence-revenue-decline",
+          "source_document_id": "doc-weekly-sales",
+          "source_type": "document",
+          "excerpt": "week-over-week decline of 11.8%",
+          "locator": "Weekly Sales Summary, paragraph 1"
+        }
+      ],
+      "source_document_id": "doc-weekly-sales"
+    },
+    {
+      "id": "signal-payroll-upcoming",
+      "type": "payroll_upcoming",
+      "title": "Payroll of $18,400 is due in 9 days",
+      "description": "The next payroll debit is scheduled for September 28.",
+      "category": "payroll",
+      "impact_level": "critical",
+      "confidence": 1.0,
+      "detected_at": "2026-09-19T09:06:00-04:00",
+      "financial_effect": {
+        "kind": "scheduled_outflow",
+        "amount_cents": 1840000,
+        "percentage": null,
+        "cadence": "one_time",
+        "calculation_status": "applied",
+        "description": "The scheduled debit is included in expected outflows."
+      },
+      "evidence": [
+        {
+          "id": "evidence-payroll-upcoming",
+          "source_document_id": "doc-payroll-calendar",
+          "source_type": "document",
+          "excerpt": "nine days after the demo's September 19 snapshot",
+          "locator": "Payroll Funding Calendar, paragraph 1"
+        }
+      ],
+      "source_document_id": "doc-payroll-calendar"
+    },
+    {
+      "id": "signal-customer-layoffs",
+      "type": "customer_layoffs_announced",
+      "title": "Customer announced layoffs",
+      "description": "Northstar Events announced a workforce reduction while INV-1042 remains unpaid.",
+      "category": "customer_risk",
+      "impact_level": "medium",
+      "confidence": 0.96,
+      "detected_at": "2026-09-19T09:08:00-04:00",
+      "financial_effect": {
+        "kind": "risk_indicator",
+        "amount_cents": null,
+        "percentage": null,
+        "cadence": null,
+        "calculation_status": "not_quantified",
+        "description": "Qualitative risk only; no financial impact is applied."
+      },
+      "evidence": [
+        {
+          "id": "evidence-customer-layoffs",
+          "source_document_id": "doc-northstar-workforce",
+          "source_type": "document",
+          "excerpt": "announced a workforce reduction as part of a cost-control program",
+          "locator": "Workforce Update, paragraph 1"
+        }
+      ],
+      "source_document_id": "doc-northstar-workforce"
+    }
+  ],
+  "documents": [
+    {
+      "id": "doc-supplier-price-notice",
+      "title": "Metro Foods Pricing Update",
+      "document_type": "supplier_notice",
+      "filename": "supplier-price-notice.md",
+      "mime_type": "text/markdown",
+      "document_date": "2026-09-15",
+      "ingested_at": "2026-09-19T08:30:00-04:00",
+      "source": "fixture",
+      "summary": "Supplier notice documenting an 18% price increase and $2,140 monthly impact.",
+      "checksum_sha256": "11ddd8a10f15fb559479e5b4c2b5426a738af1e6d5c3fc60601ca0f74c036d39",
+      "related_signal_ids": [
+        "signal-supplier-increase"
+      ]
+    },
+    {
+      "id": "doc-inv-1042",
+      "title": "Invoice INV-1042",
+      "document_type": "invoice",
+      "filename": "invoice-inv-1042.md",
+      "mime_type": "text/markdown",
+      "document_date": "2026-08-18",
+      "ingested_at": "2026-09-19T08:31:00-04:00",
+      "source": "fixture",
+      "summary": "$12,400 Northstar Events invoice, 17 days overdue at the snapshot date.",
+      "checksum_sha256": "edab776ee2c3dc8626f05cb5396c096ca12169706edd4104a5d4181784127781",
+      "related_signal_ids": [
+        "signal-invoice-overdue"
+      ]
+    },
+    {
+      "id": "doc-weekly-sales",
+      "title": "Weekly Sales Summary",
+      "document_type": "sales_report",
+      "filename": "weekly-sales-summary.md",
+      "mime_type": "text/markdown",
+      "document_date": "2026-09-18",
+      "ingested_at": "2026-09-19T08:32:00-04:00",
+      "source": "fixture",
+      "summary": "Weekly booked revenue report showing an 11.8% week-over-week decline.",
+      "checksum_sha256": "b46f65e08b53d7875002911ac21530a79fb3ba5b5ad31ff94a49d43088aeef47",
+      "related_signal_ids": [
+        "signal-revenue-decline"
+      ]
+    },
+    {
+      "id": "doc-payroll-calendar",
+      "title": "Payroll Funding Calendar",
+      "document_type": "payroll_schedule",
+      "filename": "payroll-calendar.md",
+      "mime_type": "text/markdown",
+      "document_date": "2026-09-19",
+      "ingested_at": "2026-09-19T08:33:00-04:00",
+      "source": "fixture",
+      "summary": "$18,400 payroll debit scheduled nine days after the snapshot.",
+      "checksum_sha256": "ab327e993ed9b8cf20685554c8de33c856257127bad4178f3d57be1c1ed615d3",
+      "related_signal_ids": [
+        "signal-payroll-upcoming"
+      ]
+    },
+    {
+      "id": "doc-northstar-workforce",
+      "title": "Northstar Events Workforce Update",
+      "document_type": "customer_update",
+      "filename": "northstar-workforce-update.md",
+      "mime_type": "text/markdown",
+      "document_date": "2026-09-18",
+      "ingested_at": "2026-09-19T08:34:00-04:00",
+      "source": "fixture",
+      "summary": "Customer workforce reduction retained as qualitative payment-risk evidence.",
+      "checksum_sha256": "e6cec82db3710a86bdcb184483ae7df2d5343cb1c3e0cc35227f6cafbbe94bb7",
+      "related_signal_ids": [
+        "signal-customer-layoffs"
+      ]
+    }
+  ],
+  "recommendations": [
+    {
+      "id": "recommendation-collect-inv-1042",
+      "title": "Escalate collection of INV-1042",
+      "description": "Contact Northstar's accounts-payable owner and request a dated payment commitment.",
+      "priority": "critical",
+      "status": "proposed",
+      "rationale": "The $12,400 receivable is already 17 days late and the customer has announced layoffs.",
+      "related_signal_ids": [
+        "signal-invoice-overdue",
+        "signal-customer-layoffs"
+      ]
+    },
+    {
+      "id": "recommendation-protect-payroll",
+      "title": "Protect the upcoming payroll reserve",
+      "description": "Keep $18,400 uncommitted for the scheduled September 28 payroll debit.",
+      "priority": "critical",
+      "status": "proposed",
+      "rationale": "Payroll is due in nine days while the forecast is below the operating-cash reserve.",
+      "related_signal_ids": [
+        "signal-payroll-upcoming",
+        "signal-invoice-overdue"
+      ]
+    },
+    {
+      "id": "recommendation-review-supplier-mix",
+      "title": "Review the high-cost supplier basket",
+      "description": "Compare alternative vendors for the ingredients affected by Metro Foods' increase.",
+      "priority": "high",
+      "status": "proposed",
+      "rationale": "The documented increase adds $2,140 to monthly costs.",
+      "related_signal_ids": [
+        "signal-supplier-increase"
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "scenario-fa762a83-79c3-5e1d-95ca-6c1b26a6f7c3",
+      "name": "Northstar pays INV-1042 next week",
+      "request": {
+        "name": "Northstar pays INV-1042 next week",
+        "revenue_change_percent": 0.0,
+        "expense_change_percent": 0.0,
+        "cash_adjustment_cents": 1240000
+      },
+      "baseline": {
+        "current_cash_cents": 4320000,
+        "expected_inflows_cents": 1940000,
+        "expected_outflows_cents": 5170000,
+        "projected_ending_cash_cents": 1090000,
+        "minimum_cash_reserve_cents": 1570000,
+        "projected_shortfall_cents": 480000,
+        "average_daily_net_burn_cents": 240000,
+        "cash_runway_days": 18
+      },
+      "projected": {
+        "current_cash_cents": 5560000,
+        "expected_inflows_cents": 1940000,
+        "expected_outflows_cents": 5170000,
+        "projected_ending_cash_cents": 2330000,
+        "minimum_cash_reserve_cents": 1570000,
+        "projected_shortfall_cents": 0,
+        "average_daily_net_burn_cents": 240000,
+        "cash_runway_days": 23
+      },
+      "assumptions": [
+        "Revenue change applies uniformly to expected inflows in the forecast window.",
+        "Expense change applies uniformly to expected outflows in the forecast window.",
+        "Daily net burn scales with the forecast net-outflow ratio.",
+        "Minimum operating cash reserve remains fixed."
+      ],
+      "calculated_at": "2026-09-19T20:34:38.141017Z"
+    },
+    {
+      "id": "scenario-edc5a3fb-0e16-59ed-a025-b88bdb0db502",
+      "name": "Delay the supplier price increase",
+      "request": {
+        "name": "Delay the supplier price increase",
+        "revenue_change_percent": 0.0,
+        "expense_change_percent": -4.14,
+        "cash_adjustment_cents": 0
+      },
+      "baseline": {
+        "current_cash_cents": 4320000,
+        "expected_inflows_cents": 1940000,
+        "expected_outflows_cents": 5170000,
+        "projected_ending_cash_cents": 1090000,
+        "minimum_cash_reserve_cents": 1570000,
+        "projected_shortfall_cents": 480000,
+        "average_daily_net_burn_cents": 240000,
+        "cash_runway_days": 18
+      },
+      "projected": {
+        "current_cash_cents": 4320000,
+        "expected_inflows_cents": 1940000,
+        "expected_outflows_cents": 4955962,
+        "projected_ending_cash_cents": 1304038,
+        "minimum_cash_reserve_cents": 1570000,
+        "projected_shortfall_cents": 265962,
+        "average_daily_net_burn_cents": 224096,
+        "cash_runway_days": 19
+      },
+      "assumptions": [
+        "Revenue change applies uniformly to expected inflows in the forecast window.",
+        "Expense change applies uniformly to expected outflows in the forecast window.",
+        "Daily net burn scales with the forecast net-outflow ratio.",
+        "Minimum operating cash reserve remains fixed."
+      ],
+      "calculated_at": "2026-09-19T20:34:38.156677Z"
+    },
+    {
+      "id": "scenario-ca3a1519-8289-5aef-9ddf-cabc9be0d071",
+      "name": "Reduce discretionary spending 10%",
+      "request": {
+        "name": "Reduce discretionary spending 10%",
+        "revenue_change_percent": 0.0,
+        "expense_change_percent": -10.0,
+        "cash_adjustment_cents": 0
+      },
+      "baseline": {
+        "current_cash_cents": 4320000,
+        "expected_inflows_cents": 1940000,
+        "expected_outflows_cents": 5170000,
+        "projected_ending_cash_cents": 1090000,
+        "minimum_cash_reserve_cents": 1570000,
+        "projected_shortfall_cents": 480000,
+        "average_daily_net_burn_cents": 240000,
+        "cash_runway_days": 18
+      },
+      "projected": {
+        "current_cash_cents": 4320000,
+        "expected_inflows_cents": 1940000,
+        "expected_outflows_cents": 4653000,
+        "projected_ending_cash_cents": 1607000,
+        "minimum_cash_reserve_cents": 1570000,
+        "projected_shortfall_cents": 0,
+        "average_daily_net_burn_cents": 201585,
+        "cash_runway_days": 21
+      },
+      "assumptions": [
+        "Revenue change applies uniformly to expected inflows in the forecast window.",
+        "Expense change applies uniformly to expected outflows in the forecast window.",
+        "Daily net burn scales with the forecast net-outflow ratio.",
+        "Minimum operating cash reserve remains fixed."
+      ],
+      "calculated_at": "2026-09-19T20:34:38.170204Z"
+    }
+  ]
+}

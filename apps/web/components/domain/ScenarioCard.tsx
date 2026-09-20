@@ -1,0 +1,71 @@
+"use client";
+
+import type { ScenarioResult } from "@runway/contracts";
+import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
+
+import { Skeleton } from "@/components/ui/States";
+import { cn } from "@/lib/cn";
+import type { QuickScenario } from "@/lib/scenarios";
+
+export function ScenarioCard({
+  scenario,
+  result,
+  loading,
+  error,
+  selected,
+  onSelect,
+}: {
+  scenario: QuickScenario;
+  result: ScenarioResult | null;
+  loading: boolean;
+  error: Error | null;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const runway = result?.projected.cash_runway_days ?? null;
+  const baseRunway = result?.baseline.cash_runway_days ?? null;
+  const delta = runway != null && baseRunway != null ? runway - baseRunway : null;
+  const DeltaIcon = delta == null || delta === 0 ? Minus : delta > 0 ? ArrowUpRight : ArrowDownRight;
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={cn(
+        "flex w-full flex-col items-start rounded-xl border bg-white p-4 text-left transition-all",
+        selected
+          ? "border-info-500 shadow-[0_0_0_3px_rgba(37,99,235,0.15)]"
+          : "border-line hover:border-line-strong hover:shadow-card-hover",
+      )}
+    >
+      <p className="text-[13.5px] font-semibold text-ink">{scenario.title}</p>
+      <p className="mt-0.5 text-[12px] text-muted">{scenario.subtitle}</p>
+      <div className="mt-4">
+        {loading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-7 w-24" />
+            <Skeleton className="h-3.5 w-16" />
+          </div>
+        ) : error ? (
+          <p className="text-xs font-medium text-danger-600">Unavailable</p>
+        ) : result ? (
+          <>
+            <p className="tabular text-[26px] font-bold leading-none tracking-tight text-ink">
+              {runway != null ? `${runway} days` : "No burn"}
+            </p>
+            <p
+              className={cn(
+                "mt-1.5 flex items-center gap-1 text-[12px] font-semibold",
+                delta == null || delta === 0 ? "text-muted" : delta > 0 ? "text-success-600" : "text-danger-600",
+              )}
+            >
+              <DeltaIcon className="h-3.5 w-3.5" aria-hidden />
+              {delta == null ? "n/a" : delta === 0 ? "No change" : `${delta > 0 ? "+" : ""}${delta} days`}
+            </p>
+          </>
+        ) : null}
+      </div>
+    </button>
+  );
+}

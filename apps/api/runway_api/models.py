@@ -136,6 +136,38 @@ class SignalEvidence(StrictModel):
     locator: Annotated[str, Field(min_length=1)]
 
 
+class SupplierFacts(StrictModel):
+    type: Literal["supplier_pricing_increase"]
+    source_document_id: Annotated[str, Field(min_length=1, max_length=100)]
+    entity: Annotated[str, Field(min_length=1, max_length=200)]
+    percentage: Annotated[float, Field(strict=True, gt=0, le=300, allow_inf_nan=False)]
+    monthly_increase_usd: Annotated[
+        float, Field(strict=True, gt=0, le=1_000_000, allow_inf_nan=False)
+    ]
+    effective_date: date | None
+    confidence: Annotated[float, Field(strict=True, ge=0, le=1, allow_inf_nan=False)]
+    excerpt: Annotated[str, Field(min_length=20, max_length=10000)]
+
+
+class ProviderMetadata(StrictModel):
+    requested_provider: Literal["fixture", "nemotron", "elevenlabs"]
+    provider: Literal["fixture", "nemotron", "elevenlabs"]
+    mode: Literal["fixture", "live", "fallback"]
+    model: str | None = None
+    failure_reason: (
+        Literal["missing_credentials", "provider_unavailable", "invalid_output"] | None
+    ) = None
+
+
+class ExtractionProvenance(StrictModel):
+    source_filename: str
+    source_title: str
+    checksum_sha256: str
+    extracted_at: datetime
+    provider: ProviderMetadata
+    attributes: SupplierFacts
+
+
 class Signal(StrictModel):
     id: str
     type: str
@@ -148,6 +180,7 @@ class Signal(StrictModel):
     financial_effect: FinancialEffect
     evidence: Annotated[list[SignalEvidence], Field(min_length=1)]
     source_document_id: str
+    extraction: ExtractionProvenance | None = None
 
     @model_validator(mode="after")
     def validate_provenance(self) -> Signal:

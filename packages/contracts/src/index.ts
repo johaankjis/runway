@@ -70,6 +70,7 @@ export interface Signal {
   financial_effect: FinancialEffect;
   evidence: SignalEvidence[];
   source_document_id: string;
+  extraction?: ExtractionProvenance | null;
 }
 
 export interface Document {
@@ -122,4 +123,53 @@ export interface ScenarioResult {
   projected: ScenarioSnapshot;
   assumptions: string[];
   calculated_at: string;
+}
+
+export interface ProviderMetadata {
+  requested_provider: "fixture" | "nemotron" | "elevenlabs";
+  provider: "fixture" | "nemotron" | "elevenlabs";
+  mode: "fixture" | "live" | "fallback";
+  model: string | null;
+  failure_reason: "missing_credentials" | "provider_unavailable" | "invalid_output" | null;
+}
+
+export interface SupplierFacts {
+  type: "supplier_pricing_increase";
+  source_document_id: string;
+  entity: string;
+  percentage: number;
+  monthly_increase_usd: number;
+  effective_date: string | null;
+  confidence: number;
+  excerpt: string;
+}
+
+export interface ExtractionProvenance {
+  source_filename: string;
+  source_title: string;
+  checksum_sha256: string;
+  extracted_at: string;
+  provider: ProviderMetadata;
+  attributes: SupplierFacts;
+}
+
+export interface ExtractionResponse {
+  signal: Signal;
+  financial_state: FinancialState;
+  application_status: "already_in_baseline";
+}
+
+export interface VoiceRequest {
+  focus?: "summary" | "runway" | "changes" | "biggest_risk" | "scenario";
+  scenario?: ScenarioRequest | null;
+}
+
+export interface VoiceResponse {
+  text: string;
+  financial_state: FinancialState;
+  signal_ids: string[];
+  scenario: ScenarioResult | null;
+  provider: ProviderMetadata;
+  audio_base64: string | null;
+  audio_mime_type: "audio/mpeg" | null;
 }

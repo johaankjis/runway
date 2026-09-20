@@ -59,6 +59,13 @@ class InMemoryRepository:
         with self._lock:
             return [item.model_copy(deep=True) for item in self._documents]
 
+    def save_signal(self, signal: Signal) -> None:
+        validated = Signal.model_validate(signal.model_dump())
+        with self._lock:
+            if validated.id not in self._signals:
+                raise ValueError("Only existing demo signals may be enriched")
+            self._signals[validated.id] = validated.model_copy(deep=True)
+
     def list_recommendations(self) -> list[Recommendation]:
         with self._lock:
             return [item.model_copy(deep=True) for item in self._recommendations]
