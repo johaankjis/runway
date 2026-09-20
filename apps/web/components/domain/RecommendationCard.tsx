@@ -1,0 +1,101 @@
+"use client";
+
+import type { Recommendation, Signal } from "@runway/contracts";
+import { ArrowRight, Landmark, PhoneCall, ShieldCheck, Store, type LucideIcon } from "lucide-react";
+import Link from "next/link";
+
+import { Pill } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { cn } from "@/lib/cn";
+import { horizonFor, horizonLabel, horizonTone } from "@/lib/presentation";
+
+const iconById: Record<string, LucideIcon> = {
+  "recommendation-collect-inv-1042": PhoneCall,
+  "recommendation-protect-payroll": ShieldCheck,
+  "recommendation-review-supplier-mix": Store,
+};
+
+const actionLabel: Record<ReturnType<typeof horizonFor>, string> = {
+  immediate: "Take action",
+  short_term: "View details",
+  long_term: "Plan now",
+};
+
+export function RecommendationCard({
+  recommendation,
+  signalsById,
+  compact = false,
+}: {
+  recommendation: Recommendation;
+  signalsById: Map<string, Signal>;
+  compact?: boolean;
+}) {
+  const horizon = horizonFor(recommendation);
+  const Icon = iconById[recommendation.id] ?? Landmark;
+  const urgent = horizon === "immediate";
+  const relatedSignals = recommendation.related_signal_ids
+    .map((id) => signalsById.get(id))
+    .filter((signal): signal is Signal => !!signal);
+  const primarySignal = relatedSignals[0];
+
+  return (
+    <article
+      className={cn(
+        "flex items-start gap-4 rounded-xl border bg-white p-4 transition-shadow hover:shadow-card-hover",
+        urgent ? "border-danger-100 bg-danger-50/40" : "border-line",
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "grid h-10 w-10 shrink-0 place-items-center rounded-lg ring-1",
+          urgent ? "bg-danger-100 text-danger-600 ring-danger-100" : "bg-slate-50 text-ink-soft ring-line",
+        )}
+      >
+        <Icon className="h-[18px] w-[18px]" />
+      </span>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-[14px] font-semibold text-ink">{recommendation.title}</h3>
+          <Pill tone={horizonTone[horizon]}>{horizonLabel[horizon]}</Pill>
+        </div>
+        <p className="mt-1 text-[12.5px] text-ink-soft">{recommendation.description}</p>
+        {!compact ? (
+          <div className="mt-2.5 space-y-1.5 text-[12px] text-muted">
+            <p>
+              <span className="font-semibold uppercase tracking-wide text-[10.5px] text-muted">Why</span>{" "}
+              {recommendation.rationale}
+            </p>
+            {relatedSignals.length ? (
+              <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                <span className="font-semibold uppercase tracking-wide text-[10.5px] text-muted">Related</span>
+                {relatedSignals.map((signal, index) => (
+                  <Link
+                    key={signal.id}
+                    href={`/signals/${signal.id}`}
+                    className="rounded text-ink underline-offset-2 hover:underline"
+                  >
+                    {signal.title}
+                    {index < relatedSignals.length - 1 ? "," : ""}
+                  </Link>
+                ))}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="hidden shrink-0 sm:block">
+        <Button
+          href={primarySignal ? `/signals/${primarySignal.id}` : "/signals"}
+          variant={urgent ? "primary" : "secondary"}
+          size="sm"
+          iconRight={urgent ? <ArrowRight className="h-3.5 w-3.5" aria-hidden /> : undefined}
+        >
+          {actionLabel[horizon]}
+        </Button>
+      </div>
+    </article>
+  );
+}
