@@ -68,12 +68,17 @@ test("one upload action automatically analyzes, incorporates, refreshes, dedupli
   assert.equal(api.extractions, 1);
   assert.equal(result.run.status, "success");
   assert.equal(result.run.response.application_status, "incorporated");
+  assert.equal(result.run.response.signal.extraction.provider.mode, "fixture");
+  assert.equal(result.run.response.signal.extraction.provider.failure_reason, null);
+  assert.equal(result.run.response.signal.financial_effect.calculation_status, "applied");
   assert.equal(published, result.run.response);
   const state = published.financial_state;
   assert.deepEqual(metrics(state), [4320000, 1940000, 5202584, 1057416, 512584, 17]);
   assert.equal(state.forecast_adjustments.length, 1);
   assert.equal(state.forecast_adjustments[0].monthly_amount_cents, 56117);
   assert.equal(state.forecast_adjustments[0].amount_cents, 32584);
+  assert.equal(state.average_daily_net_burn_cents, 242421);
+  assert.deepEqual(await api.request("GET", "/api/financial-state"), state);
   assert.deepEqual(phases, ["analyzing"]);
   // Rendering, subscribing and navigating back are read-only operations.
   for (let index = 0; index < 5; index++) {
@@ -83,6 +88,7 @@ test("one upload action automatically analyzes, incorporates, refreshes, dedupli
   }
   assert.equal(api.extractions, 1);
   const repeated = await workflow.analyze(result.document.id);
+  assert.deepEqual(repeated.response, result.run.response);
   assert.deepEqual(repeated.response.financial_state, state);
   const duplicate = await workflow.upload(await freshfields(), () => {});
   assert.equal(duplicate.run.response.application_status, "potential_duplicate");
@@ -122,8 +128,12 @@ test("automatic analysis preserves invalid Nemotron/provenance fallback policy",
   const result = await workflow.upload(await freshfields(), () => {});
   assert.equal(result.run.status, "success");
   assert.equal(result.run.response.signal.extraction.provider.mode, "fallback");
+  assert.equal(result.run.response.signal.extraction.provider.failure_reason, "invalid_output");
+  assert.equal(result.run.response.signal.disposition, "proposed");
   assert.equal(result.run.response.application_status, "proposed");
   assert.deepEqual(result.run.response.financial_state, baseline);
+  assert.deepEqual((await workflow.analyze(result.document.id)).response, result.run.response);
+  assert.deepEqual(await api.request("GET", "/api/financial-state"), baseline);
 });
 
 test("overlapping manual analysis shares the upload's in-flight request", async () => {

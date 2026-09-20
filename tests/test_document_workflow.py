@@ -11,7 +11,15 @@ def test_automatic_document_workflow():
     result = subprocess.run(
         ["node", "--test", "tests/document-workflow.test.mjs"],
         cwd=REPOSITORY_ROOT,
-        env={**os.environ, "RUNWAY_TEST_PYTHON": sys.executable},
+        env={
+            **os.environ,
+            "RUNWAY_TEST_PYTHON": sys.executable,
+            # pytest's pythonpath setting does not propagate to the Node/Python bridge.
+            # Prefer this checkout over any editable install in the shared virtualenv.
+            "PYTHONPATH": os.pathsep.join(
+                filter(None, [str(REPOSITORY_ROOT / "apps/api"), os.environ.get("PYTHONPATH")])
+            ),
+        },
         capture_output=True,
         text=True,
         timeout=60,

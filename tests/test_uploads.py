@@ -382,12 +382,41 @@ def test_captured_freshfields_pdf_response(repository, monkeypatch, change):
         assert provenance["attributes"]["monthly_increase_usd"] is None
         assert provenance["attributes"]["percentage"] == 7
         assert provenance["attributes"]["effective_date"] == "2026-10-01"
+        assert provenance["attributes"]["entity"] == "FreshFields Produce"
+        assert provenance["attributes"]["source_document_id"] == doc["id"]
+        assert provenance["checksum_sha256"] == doc["checksum_sha256"]
         assert signal["evidence"][0]["excerpt"] == repository.get_uploaded_text(doc["id"])
         assert signal["financial_effect"]["amount_cents"] == 56117
-        assert signal["disposition"] == "proposed"
-        assert body["application_status"] == "proposed"
-        assert repository.get_financial_state() == baseline
+        assert signal["disposition"] == ("incorporated" if valid else "proposed")
+        assert body["application_status"] == ("incorporated" if valid else "proposed")
+        state = repository.get_financial_state()
+        assert body["financial_state"] == state.model_dump(mode="json")
+        if valid:
+            assert signal["financial_effect"]["calculation_status"] == "applied"
+            (adjustment,) = state.forecast_adjustments
+            assert adjustment.monthly_amount_cents == 56117
+            assert adjustment.amount_cents == 32584
+            assert adjustment.source_signal_id == signal["id"]
+            assert adjustment.source_document_id == doc["id"]
+            assert "18/31" in adjustment.calculation_explanation
+            (entry,) = state.cash_flow[len(baseline.cash_flow) :]
+            assert entry.id == adjustment.id
+            assert entry.direction == "outflow"
+            assert entry.amount_cents == 32584
+            assert entry.expected_date == baseline.forecast_end_date
+            assert entry.source_document_id == doc["id"]
+            assert entry.status == "expected"
+            expected = baseline.model_copy(deep=True)
+            expected.expected_outflows_cents = 5202584
+            expected.projected_ending_cash_cents = 1057416
+            expected.projected_shortfall_cents = 512584
+            expected.average_daily_net_burn_cents = 242421
+            expected.cash_runway_days = 17
+            expected.cash_flow.append(entry)
+            expected.forecast_adjustments.append(adjustment)
+            assert state == expected
+        else:
+            assert state == baseline
         assert analyze(client, doc).json() == body
         assert len(calls) == 1
-        assert repository.get_financial_state() == baseline
-
+        assert repository.get_financial_state() == state
