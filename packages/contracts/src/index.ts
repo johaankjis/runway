@@ -130,7 +130,7 @@ export interface ProviderMetadata {
   provider: "fixture" | "nemotron" | "elevenlabs";
   mode: "fixture" | "live" | "fallback";
   model: string | null;
-  failure_reason: "missing_credentials" | "provider_unavailable" | "invalid_output" | null;
+  failure_reason: "missing_credentials" | "provider_unavailable" | "invalid_output" | "grounding_validation_failed" | null;
 }
 
 export interface SupplierFacts {
@@ -159,12 +159,16 @@ export interface ExtractionResponse {
   application_status: "already_in_baseline";
 }
 
+export type VoiceLanguage = "en" | "es" | "fr" | "hi" | "ar";
+
 export interface VoiceRequest {
+  language?: VoiceLanguage;
   focus?: "summary" | "runway" | "changes" | "biggest_risk" | "scenario";
   scenario?: ScenarioRequest | null;
 }
 
 export interface VoiceResponse {
+  language?: VoiceLanguage;
   text: string;
   financial_state: FinancialState;
   signal_ids: string[];

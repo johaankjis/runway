@@ -1,6 +1,6 @@
 "use client";
 
-import type { VoiceResponse } from "@runway/contracts";
+import type { VoiceLanguage, VoiceResponse } from "@runway/contracts";
 import { AlertTriangle, ArrowRight, FlaskConical, Quote, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -46,6 +46,7 @@ export function VoiceView() {
   const signals = useApi("signals", api.getSignals, { revalidate: true });
 
   const [phase, setPhase] = useState<"idle" | "generating" | "ready" | "error">("idle");
+  const [language, setLanguage] = useState<VoiceLanguage>("en");
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [activePrompt, setActivePrompt] = useState<VoicePrompt | null>(null);
@@ -72,7 +73,7 @@ export function VoiceView() {
       setPlaying(false);
       audioRef.current?.pause();
       try {
-        const response = await api.createVoiceBriefing(prompt.request);
+        const response = await api.createVoiceBriefing({ ...prompt.request, language });
         if (id !== requestId.current) return;
         releaseAudio();
         let audio: AudioState = { kind: "none" };
@@ -101,7 +102,7 @@ export function VoiceView() {
         setPhase("error");
       }
     },
-    [releaseAudio],
+    [releaseAudio, language],
   );
 
   const hasLiveAudio = briefing?.audio.kind === "ready";
@@ -160,6 +161,29 @@ export function VoiceView() {
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.35fr_1fr]">
         <div className="space-y-6">
+          <label className="flex items-center gap-3 text-[13px] font-semibold text-ink">
+            Briefing language
+            <select
+              value={language}
+              disabled={phase === "generating"}
+              onChange={(event) => {
+                setLanguage(event.target.value as VoiceLanguage);
+                audioRef.current?.pause();
+                setPlaying(false);
+                releaseAudio();
+                setBriefing(null);
+                setPhase("idle");
+                setError(null);
+              }}
+              className="rounded-lg border border-line bg-white px-3 py-2 text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-info-500"
+            >
+              <option value="en">English</option>
+              <option value="es">Español</option>
+              <option value="fr">Français</option>
+              <option value="hi">हिन्दी</option>
+              <option value="ar">العربية</option>
+            </select>
+          </label>
           <VoiceAssistantPanel
             status={status}
             onPrimary={onPrimary}
@@ -191,7 +215,11 @@ export function VoiceView() {
               <div className="space-y-4">
                 <blockquote className="flex items-start gap-3 rounded-xl bg-canvas p-4">
                   <Quote className="mt-1 h-4 w-4 shrink-0 text-info-500" aria-hidden />
-                  <p className="text-[15px] leading-relaxed text-ink">{briefing.response.text}</p>
+                  <p
+                    lang={briefing.response.language ?? "en"}
+                    dir={briefing.response.language === "ar" ? "rtl" : "ltr"}
+                    className="min-w-0 flex-1 text-start text-[15px] leading-relaxed text-ink"
+                  >{briefing.response.text}</p>
                 </blockquote>
 
                 {briefing.audio.kind === "ready" ? (

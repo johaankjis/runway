@@ -18,12 +18,17 @@ class ExtractionResponse(StrictModel):
     application_status: Literal["already_in_baseline"] = "already_in_baseline"
 
 
+VoiceLanguage = Literal["en", "es", "fr", "hi", "ar"]
+
+
 class VoiceRequest(StrictModel):
+    language: VoiceLanguage = "en"
     focus: Literal["summary", "runway", "changes", "biggest_risk", "scenario"] = "summary"
     scenario: ScenarioRequest | None = None
 
 
 class VoiceResponse(StrictModel):
+    language: VoiceLanguage = "en"
     text: str
     financial_state: FinancialState
     signal_ids: list[str]
