@@ -92,7 +92,7 @@
       "id": "signal-supplier-increase",
       "type": "supplier_pricing_increase",
       "title": "Supplier pricing increased 18%",
-      "description": "Harbor Foods raised pricing on Maya's standard ingredient basket.",
+      "description": "Metro Foods raised pricing on Maya's standard ingredient basket.",
       "category": "expenses",
       "impact_level": "high",
       "confidence": 0.99,
@@ -232,7 +232,7 @@
   "documents": [
     {
       "id": "doc-supplier-price-notice",
-      "title": "Harbor Foods Pricing Update",
+      "title": "Metro Foods Pricing Update",
       "document_type": "supplier_notice",
       "filename": "supplier-price-notice.md",
       "mime_type": "text/markdown",
@@ -334,7 +334,7 @@
     {
       "id": "recommendation-review-supplier-mix",
       "title": "Review the high-cost supplier basket",
-      "description": "Compare alternative vendors for the ingredients affected by Harbor Foods' increase.",
+      "description": "Compare alternative vendors for the ingredients affected by Metro Foods' increase.",
       "priority": "high",
       "status": "proposed",
       "rationale": "The documented increase adds $2,140 to monthly costs.",

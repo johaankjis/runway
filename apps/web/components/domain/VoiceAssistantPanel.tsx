@@ -1,25 +1,30 @@
 "use client";
 
-import { Mic, MicOff, Square } from "lucide-react";
+import { AlertTriangle, AudioLines, FlaskConical, Loader2, Pause, Play } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
+import type { VoicePrompt } from "@/lib/voice";
 
-export type VoiceStatus = "idle" | "listening" | "processing" | "speaking" | "unavailable";
-
-export interface TranscriptEntry {
-  id: string;
-  role: "user" | "runway";
-  text: string;
-  at: string;
-}
+/**
+ * idle       nothing generated yet
+ * generating waiting on POST /api/voice/briefing
+ * ready      briefing with live audio, not playing
+ * playing    live audio is playing
+ * fixture    briefing generated in fixture mode (text only, by design)
+ * fallback   live provider requested but unavailable (text only)
+ * error      the request failed
+ */
+export type VoiceStatus = "idle" | "generating" | "ready" | "playing" | "fixture" | "fallback" | "error";
 
 const statusCopy: Record<VoiceStatus, string> = {
-  idle: "Tap to talk to Runway",
-  listening: "I'm listening…",
-  processing: "Checking your numbers…",
-  speaking: "Runway is responding",
-  unavailable: "Voice provider not connected",
+  idle: "Ask Runway for a grounded briefing",
+  generating: "Checking your numbers…",
+  ready: "Briefing ready · tap to play",
+  playing: "Runway is speaking",
+  fixture: "Briefing ready · text only (demo fixture)",
+  fallback: "Briefing ready · voice provider unavailable",
+  error: "Couldn't generate a briefing",
 };
 
 function Waveform({ active }: { active: boolean }) {
@@ -45,103 +50,100 @@ function Waveform({ active }: { active: boolean }) {
 }
 
 /**
- * Visual shell for the voice experience. The ElevenLabs integration can drive
- * `status`, `transcript`, and the `onToggle` handler without changing layout.
+ * Voice-first shell. The primary control generates a briefing (or plays/pauses
+ * live audio once one exists); prompt chips pick which supported focus to ask.
  */
 export function VoiceAssistantPanel({
   status,
-  onToggle,
-  suggestions,
-  onSuggestion,
+  onPrimary,
+  primaryLabel,
+  prompts,
+  activePromptId,
+  onPrompt,
   disabled = false,
   footer,
 }: {
   status: VoiceStatus;
-  onToggle: () => void;
-  suggestions: string[];
-  onSuggestion: (question: string) => void;
+  onPrimary: () => void;
+  primaryLabel: string;
+  prompts: VoicePrompt[];
+  activePromptId: string | null;
+  onPrompt: (prompt: VoicePrompt) => void;
   disabled?: boolean;
   footer?: ReactNode;
 }) {
-  const active = status === "listening" || status === "speaking" || status === "processing";
-  const Icon = status === "unavailable" ? MicOff : status === "listening" ? Square : Mic;
+  const busy = status === "generating";
+  const active = status === "playing" || busy;
+  const Icon =
+    status === "generating"
+      ? Loader2
+      : status === "playing"
+        ? Pause
+        : status === "ready"
+          ? Play
+          : status === "fallback"
+            ? AlertTriangle
+            : status === "fixture"
+              ? FlaskConical
+              : AudioLines;
 
   return (
     <section
-      aria-label="Voice interaction"
+      aria-label="Voice briefing"
       className="flex flex-col items-center rounded-2xl border border-line bg-white px-6 py-8 shadow-card"
     >
-      <p role="status" aria-live="polite" className="text-[17px] font-semibold text-ink">
+      <p role="status" aria-live="polite" className="text-center text-[17px] font-semibold text-ink">
         {statusCopy[status]}
       </p>
 
       <div className="mt-6 flex h-[172px] w-full max-w-md items-center justify-center gap-6">
-        <Waveform active={status === "listening"} />
+        <Waveform active={status === "playing"} />
         <div className="relative grid place-items-center">
           {active ? (
             <span aria-hidden className="absolute inset-0 rounded-full bg-danger-500/30 animate-pulse-ring" />
           ) : null}
           <button
             type="button"
-            onClick={onToggle}
-            disabled={disabled}
-            aria-pressed={status === "listening"}
-            aria-label={status === "listening" ? "Stop listening" : "Start talking to Runway"}
+            onClick={onPrimary}
+            disabled={disabled || busy}
+            aria-busy={busy}
+            aria-label={primaryLabel}
             className={cn(
               "relative grid h-24 w-24 place-items-center rounded-full bg-navy-900 text-white transition-all",
               "hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-60",
               active ? "shadow-glow ring-4 ring-danger-500/50" : "shadow-pop ring-4 ring-danger-500/20",
             )}
           >
-            <Icon className="h-9 w-9" aria-hidden />
+            <Icon className={cn("h-9 w-9", busy && "animate-spin")} aria-hidden />
           </button>
         </div>
-        <Waveform active={status === "speaking"} />
+        <Waveform active={status === "playing"} />
       </div>
 
-      <div className="mt-7 flex flex-wrap justify-center gap-2">
-        {suggestions.map((question) => (
-          <button
-            key={question}
-            type="button"
-            onClick={() => onSuggestion(question)}
-            className="rounded-full border border-line-strong bg-white px-3.5 py-1.5 text-[12.5px] font-medium text-ink transition-colors hover:border-navy-600 hover:bg-slate-50"
-          >
-            “{question}”
-          </button>
-        ))}
+      <div role="group" aria-label="Suggested questions" className="mt-7 flex flex-wrap justify-center gap-2">
+        {prompts.map((prompt) => {
+          const selected = prompt.id === activePromptId;
+          return (
+            <button
+              key={prompt.id}
+              type="button"
+              onClick={() => onPrompt(prompt)}
+              disabled={disabled || busy}
+              aria-pressed={selected}
+              className={cn(
+                "rounded-full border px-3.5 py-1.5 text-[12.5px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+                selected
+                  ? "border-navy-900 bg-navy-900 text-white"
+                  : "border-line-strong bg-white text-ink hover:border-navy-600 hover:bg-slate-50",
+              )}
+            >
+              “{prompt.label}”
+            </button>
+          );
+        })}
       </div>
 
-      {footer ? <div className="mt-6 text-[11.5px] text-muted">{footer}</div> : null}
+      {footer ? <div className="mt-6 text-center text-[11.5px] text-muted">{footer}</div> : null}
     </section>
-  );
-}
-
-export function TranscriptList({ entries }: { entries: TranscriptEntry[] }) {
-  if (!entries.length) {
-    return (
-      <p className="rounded-xl border border-dashed border-line-strong px-4 py-6 text-center text-[12.5px] text-muted">
-        Your conversation with Runway will appear here.
-      </p>
-    );
-  }
-  return (
-    <ol className="space-y-3">
-      {entries.map((entry) => (
-        <li key={entry.id} className={cn("flex", entry.role === "user" ? "justify-end" : "justify-start")}>
-          <div
-            className={cn(
-              "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed",
-              entry.role === "user" ? "rounded-br-md bg-navy-900 text-white" : "rounded-bl-md bg-slate-100 text-ink",
-            )}
-          >
-            <p className="mb-0.5 text-[10.5px] font-semibold uppercase tracking-wide opacity-60">
-              {entry.role === "user" ? "You" : "Runway"}
-            </p>
-            {entry.text}
-          </div>
-        </li>
-      ))}
-    </ol>
   );
 }

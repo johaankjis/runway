@@ -237,7 +237,10 @@ export function SettingsView() {
                 <Toggle label="Shorten responses for demo" description="Keep spoken answers under 20 seconds." />
                 <Toggle label="Read alerts aloud" description="Speak critical alerts when the app opens." defaultOn={false} />
               </div>
-              <p className="mt-3 text-[12px] text-muted">Provider configuration is handled by the ElevenLabs integration.</p>
+              <p className="mt-3 text-[12px] text-muted">
+                Speech is produced by the Runway API. Set RUNWAY_VOICE_PROVIDER=elevenlabs with an ElevenLabs key and voice ID
+                for live audio; the default fixture mode is text-only.
+              </p>
             </Card>
           ) : null}
 

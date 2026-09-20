@@ -28,6 +28,15 @@ export function invalidateApiCache(prefix?: string) {
   }
 }
 
+/**
+ * Seed the cache with a value the backend just returned (e.g. the enriched
+ * signal inside an extraction response) so the next screen renders the
+ * persisted state immediately instead of a stale snapshot.
+ */
+export function primeApiCache<T>(key: string, value: T) {
+  cache.set(key, value);
+}
+
 interface Outcome<T> {
   key: string | null;
   tick: number;
@@ -40,7 +49,21 @@ interface Outcome<T> {
  * and serves cached results instantly on revisit. Intentionally small; no
  * external state library.
  */
-export function useApi<T>(key: string | null, fetcher: () => Promise<T>): ApiState<T> {
+export interface UseApiOptions {
+  /**
+   * Serve the cached value immediately but always refetch on mount. Used by
+   * screens that must reflect state persisted by another action (for example
+   * extraction provenance stored on a signal) instead of a stale snapshot.
+   */
+  revalidate?: boolean;
+}
+
+export function useApi<T>(
+  key: string | null,
+  fetcher: () => Promise<T>,
+  options: UseApiOptions = {},
+): ApiState<T> {
+  const { revalidate = false } = options;
   const [tick, setTick] = useState(0);
   const [outcome, setOutcome] = useState<Outcome<T>>({ key: null, tick: -1, data: null, error: null });
   const fetcherRef = useRef(fetcher);
@@ -57,7 +80,7 @@ export function useApi<T>(key: string | null, fetcher: () => Promise<T>): ApiSta
 
   useEffect(() => {
     if (!key) return;
-    if (cache.has(key) && tick === 0) return;
+    if (cache.has(key) && tick === 0 && !revalidate) return;
     let cancelled = false;
     fetcherRef
       .current()
@@ -73,7 +96,7 @@ export function useApi<T>(key: string | null, fetcher: () => Promise<T>): ApiSta
     return () => {
       cancelled = true;
     };
-  }, [key, tick]);
+  }, [key, tick, revalidate]);
 
   const refetch = useCallback(() => {
     if (key) cache.delete(key);

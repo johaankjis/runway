@@ -163,3 +163,18 @@ export function matchesDocumentFilter(type: string, filter: DocumentFilter): boo
   }
   return type === filter;
 }
+
+// --- Evidence ---------------------------------------------------------------
+
+/**
+ * Evidence excerpts are verbatim source text (that is what makes them
+ * verifiable). For display only, strip Markdown emphasis markers and trailing
+ * hard-break spaces so a quoted span reads cleanly.
+ */
+export function cleanExcerpt(excerpt: string): string {
+  return excerpt
+    .split("\n")
+    .map((line) => line.replace(/^#{1,6}\s+/, "").replace(/\*\*/g, "").replace(/\s+$/, ""))
+    .join("\n")
+    .trim();
+}

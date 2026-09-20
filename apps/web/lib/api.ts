@@ -17,11 +17,14 @@
 import type {
   Business,
   Document,
+  ExtractionResponse,
   FinancialState,
   Recommendation,
   ScenarioRequest,
   ScenarioResult,
   Signal,
+  VoiceRequest,
+  VoiceResponse,
 } from "@runway/contracts";
 
 import { fixtureApi } from "./fixtures/fixture-adapter";
@@ -48,6 +51,10 @@ export interface RunwayApi {
   getRecommendations(): Promise<Recommendation[]>;
   runScenario(request: ScenarioRequest): Promise<ScenarioResult>;
   resetDemo(): Promise<ResetResponse>;
+  /** POST /api/documents/{id}/extract — Nemotron/fixture extraction with provenance. */
+  extractDocument(documentId: string): Promise<ExtractionResponse>;
+  /** POST /api/voice/briefing — grounded briefing text plus optional ElevenLabs audio. */
+  createVoiceBriefing(request: VoiceRequest): Promise<VoiceResponse>;
 }
 
 export class ApiError extends Error {
@@ -150,6 +157,16 @@ export const liveApi: RunwayApi = {
       body: JSON.stringify(payload),
     }),
   resetDemo: () => request<ResetResponse>("/api/demo/reset", { method: "POST" }),
+  extractDocument: (documentId) =>
+    request<ExtractionResponse>(`/api/documents/${encodeURIComponent(documentId)}/extract`, {
+      method: "POST",
+    }),
+  createVoiceBriefing: (payload) =>
+    request<VoiceResponse>("/api/voice/briefing", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
 };
 
 // ---------------------------------------------------------------------------
@@ -195,4 +212,6 @@ export const api: RunwayApi = {
   getRecommendations: withFallback(liveApi.getRecommendations, fixtureApi.getRecommendations),
   runScenario: withFallback(liveApi.runScenario, fixtureApi.runScenario),
   resetDemo: withFallback(liveApi.resetDemo, fixtureApi.resetDemo),
+  extractDocument: withFallback(liveApi.extractDocument, fixtureApi.extractDocument),
+  createVoiceBriefing: withFallback(liveApi.createVoiceBriefing, fixtureApi.createVoiceBriefing),
 };

@@ -16,6 +16,11 @@ export function formatCents(cents: number): string {
   return usd.format(Math.round(cents / 100));
 }
 
+/** $2,140 — for amounts the API already expresses in whole USD (e.g. extracted facts). */
+export function formatUsd(dollars: number): string {
+  return usd.format(dollars);
+}
+
 /** +$19,400 / -$51,700 */
 export function formatSignedCents(cents: number): string {
   if (cents === 0) return usd.format(0);

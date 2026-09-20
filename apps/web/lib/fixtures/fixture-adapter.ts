@@ -43,6 +43,15 @@ function canonical(request: ScenarioRequest): string {
   });
 }
 
+export class FixtureProviderUnavailableError extends Error {
+  constructor(feature: string) {
+    super(
+      `${feature} runs on the Runway API, not in the browser snapshot. Start the API (fixture provider mode needs no credentials) and try again.`,
+    );
+    this.name = "FixtureProviderUnavailableError";
+  }
+}
+
 export class FixtureScenarioUnavailableError extends Error {
   constructor() {
     super(
@@ -97,5 +106,15 @@ export const fixtureApi: RunwayApi = {
   async resetDemo(): Promise<ResetResponse> {
     await delay();
     return { status: "reset", business_id: data.business.id };
+  },
+  async extractDocument() {
+    await delay(60);
+    // Never fake an extraction: provenance must come from the backend pipeline.
+    throw new FixtureProviderUnavailableError("Document extraction");
+  },
+  async createVoiceBriefing() {
+    await delay(60);
+    // Never fabricate a briefing: the text is grounded by the backend engine state.
+    throw new FixtureProviderUnavailableError("Voice briefing");
   },
 };

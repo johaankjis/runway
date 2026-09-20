@@ -4,6 +4,7 @@ import { ArrowLeft, Check, Share2, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
+import { ProviderBadge, ProviderNote } from "@/components/domain/ProviderBadge";
 import { SignalIcon } from "@/components/domain/SignalIcon";
 import { ProvenanceFlow, SourceDocumentViewer } from "@/components/domain/SourceEvidence";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -14,7 +15,7 @@ import { Tabs } from "@/components/ui/Tabs";
 import { ErrorState, LoadingState } from "@/components/ui/States";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
-import { formatConfidence, formatDate, formatDateTime } from "@/lib/format";
+import { formatConfidence, formatDate, formatDateTime, formatUsd } from "@/lib/format";
 import {
   calculationStatusLabel,
   calculationStatusTone,
@@ -36,7 +37,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export function SignalDetailView({ id }: { id: string }) {
-  const signal = useApi(`signal:${id}`, () => api.getSignal(id));
+  // Revalidate on mount so provenance persisted by an extraction run is never stale.
+  const signal = useApi(`signal:${id}`, () => api.getSignal(id), { revalidate: true });
   const documents = useApi("documents", api.getDocuments);
   const [tab, setTab] = useState<Tab>("summary");
   const [copied, setCopied] = useState(false);
@@ -75,6 +77,7 @@ export function SignalDetailView({ id }: { id: string }) {
   const data = signal.data;
   const effect = data.financial_effect;
   const headline = effectHeadline(effect);
+  const extraction = data.extraction ?? null;
 
   return (
     <div className="animate-fade-in">
@@ -95,6 +98,7 @@ export function SignalDetailView({ id }: { id: string }) {
               <ImpactBadge level={data.impact_level} />
               <Pill tone="neutral">{labelForCategory(data.category)}</Pill>
               <Pill tone="info">Confidence {formatConfidence(data.confidence)}</Pill>
+              {extraction ? <ProviderBadge meta={extraction.provider} kind="extraction" /> : null}
             </div>
           </div>
         }
@@ -137,6 +141,16 @@ export function SignalDetailView({ id }: { id: string }) {
               <Field label="Detected">{formatDateTime(data.detected_at)}</Field>
               <Field label="Source">{document?.title ?? data.source_document_id}</Field>
             </div>
+            {extraction ? (
+              <Field label="Extraction">
+                <ProviderNote meta={extraction.provider} kind="extraction" />
+                <p className="mt-1.5 text-[12px] text-muted">
+                  {extraction.attributes.entity} · +{extraction.attributes.percentage}% · {formatUsd(extraction.attributes.monthly_increase_usd)} per month
+                  {extraction.attributes.effective_date ? ` · effective ${formatDate(extraction.attributes.effective_date)}` : ""} · extracted{" "}
+                  {formatDateTime(extraction.extracted_at)}
+                </p>
+              </Field>
+            ) : null}
             <div className="border-t border-line pt-4">
               <Button href="/scenarios" variant="secondary" size="sm" icon={<SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />}>
                 Explore a scenario
@@ -191,12 +205,31 @@ export function SignalDetailView({ id }: { id: string }) {
                   [`Evidence ${item.id} · excerpt`, item.excerpt],
                   [`Evidence ${item.id} · locator`, item.locator],
                 ]),
+                ...(extraction
+                  ? [
+                      ["Extraction · source file", extraction.source_filename],
+                      ["Extraction · source title", extraction.source_title],
+                      ["Extraction · checksum", extraction.checksum_sha256],
+                      ["Extraction · extracted at", extraction.extracted_at],
+                      ["Extraction · requested provider", extraction.provider.requested_provider],
+                      ["Extraction · provider", extraction.provider.provider],
+                      ["Extraction · mode", extraction.provider.mode],
+                      ["Extraction · model", extraction.provider.model ?? "null"],
+                      ["Extraction · failure reason", extraction.provider.failure_reason ?? "null"],
+                      ["Facts · type", extraction.attributes.type],
+                      ["Facts · entity", extraction.attributes.entity],
+                      ["Facts · percentage", extraction.attributes.percentage],
+                      ["Facts · monthly increase (USD)", extraction.attributes.monthly_increase_usd],
+                      ["Facts · effective date", extraction.attributes.effective_date ?? "null"],
+                      ["Facts · confidence", formatConfidence(extraction.attributes.confidence)],
+                    ]
+                  : [["Extraction", "Not yet run — analyze the source document to attach provenance"]]),
               ].map(([key, value]) => (
                 <tr key={String(key)} className="border-b border-line last:border-b-0">
                   <th scope="row" className="w-64 px-4 py-2.5 font-medium text-muted">
                     {key}
                   </th>
-                  <td className="px-4 py-2.5 font-mono text-[12px] text-ink">{String(value)}</td>
+                  <td className="break-all px-4 py-2.5 font-mono text-[12px] text-ink">{String(value)}</td>
                 </tr>
               ))}
             </tbody>

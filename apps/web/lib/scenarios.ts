@@ -33,7 +33,7 @@ export const QUICK_SCENARIOS: QuickScenario[] = [
   {
     id: "delay-supplier",
     title: "Delay supplier price increase",
-    subtitle: "Push Harbor Foods' 18% increase past the window",
+    subtitle: "Push Metro Foods' 18% increase past the window",
     modeling: "Modeled as -4.14% expected outflows ($2,140 of $51,700).",
     request: {
       name: "Delay the supplier price increase",
