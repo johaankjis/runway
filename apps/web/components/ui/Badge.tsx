@@ -41,7 +41,7 @@ export function Pill({
     <span
       title={title}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold leading-5 whitespace-nowrap",
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold leading-5 whitespace-nowrap",
         toneClasses[tone],
         className,
       )}

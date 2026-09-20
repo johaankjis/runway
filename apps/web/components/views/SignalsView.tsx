@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { SignalRow } from "@/components/domain/SignalRow";
@@ -30,7 +31,7 @@ export function SignalsView() {
     <div className="animate-fade-in">
       <PageHeader title="Signals" subtitle="Recent changes that may impact your business, ranked by impact." />
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <FilterPills
           label="Filter signals by impact"
           value={filter}
@@ -42,12 +43,12 @@ export function SignalsView() {
             { key: "low", label: "Low", count: count("low") },
           ]}
         />
-        <label className="flex items-center gap-2 text-[12.5px] text-muted">
-          <span>Category</span>
+        <label className="relative inline-flex items-center">
+          <span className="sr-only">Filter by category</span>
           <select
             value={category}
             onChange={(event) => setCategory(event.target.value)}
-            className="h-8 rounded-lg border border-line-strong bg-white px-2.5 text-[12.5px] font-medium text-ink"
+            className="select-plain h-9 cursor-pointer rounded-lg border border-line-strong bg-white pl-3 pr-9 text-[13px] font-medium text-ink shadow-sm focus:border-info-500 focus:outline-none"
           >
             <option value="all">All categories</option>
             {categories.map((item) => (
@@ -56,6 +57,7 @@ export function SignalsView() {
               </option>
             ))}
           </select>
+          <ChevronDown className="pointer-events-none absolute right-3 h-4 w-4 text-muted" aria-hidden />
         </label>
       </div>
 

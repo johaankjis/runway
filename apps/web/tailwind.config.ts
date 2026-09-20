@@ -24,7 +24,7 @@ const config: Config = {
           DEFAULT: "#64748B",
           light: "#94A3B8",
         },
-        canvas: "#F6F5F2",
+        canvas: "#F5F7FA",
         line: {
           DEFAULT: "#E6E8EE",
           strong: "#D5D9E2",
@@ -71,14 +71,14 @@ const config: Config = {
         ],
       },
       boxShadow: {
-        card: "0 1px 2px rgba(15, 27, 49, 0.04), 0 4px 16px rgba(15, 27, 49, 0.05)",
+        card: "0 1px 2px rgba(15, 27, 49, 0.04), 0 2px 10px rgba(15, 27, 49, 0.04)",
         "card-hover": "0 2px 4px rgba(15, 27, 49, 0.06), 0 10px 28px rgba(15, 27, 49, 0.09)",
         pop: "0 12px 40px rgba(15, 27, 49, 0.18)",
         glow: "0 0 0 10px rgba(225, 29, 72, 0.12), 0 0 48px rgba(225, 29, 72, 0.35)",
       },
       borderRadius: {
-        xl: "14px",
-        "2xl": "18px",
+        xl: "12px",
+        "2xl": "16px",
       },
       keyframes: {
         "fade-in": {

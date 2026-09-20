@@ -1,7 +1,7 @@
 "use client";
 
 import type { Document, Signal } from "@runway/contracts";
-import { Sparkles, Upload, UploadCloud } from "lucide-react";
+import { Plus, Sparkles, UploadCloud } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore, type DragEvent } from "react";
 
 import { DocumentAnalysisPanel } from "@/components/domain/DocumentAnalysisPanel";
@@ -146,9 +146,9 @@ export function DocumentsView() {
     <div className="animate-fade-in">
       <PageHeader
         title="Documents"
-        subtitle="Upload a document. Runway automatically analyzes its evidence and updates eligible forecasts."
+        subtitle="Upload, manage, and see what Runway extracted. Analysis starts automatically after upload."
         actions={
-          <Button variant="secondary" disabled={uploading} onClick={() => inputRef.current?.click()} icon={<Upload className="h-4 w-4" aria-hidden />}>
+          <Button disabled={uploading} onClick={() => inputRef.current?.click()} icon={<Plus className="h-4 w-4" aria-hidden />}>
             Upload document
           </Button>
         }
@@ -185,30 +185,31 @@ export function DocumentsView() {
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         className={cn(
-          "mb-5 flex cursor-pointer items-center gap-4 rounded-2xl border-2 border-dashed bg-white px-5 py-4 transition-colors",
-          dragging ? "border-info-500 bg-info-50" : "border-line-strong hover:border-navy-600",
+          "mb-5 flex cursor-pointer items-center gap-4 rounded-2xl border border-dashed px-5 py-4 transition-colors",
+          dragging ? "border-info-500 bg-info-50" : "border-line-strong bg-white hover:border-navy-600 hover:bg-slate-50/60",
         )}
       >
-        <span aria-hidden className="grid h-11 w-11 place-items-center rounded-xl bg-info-50 text-info-600">
+        <span aria-hidden className="grid h-11 w-11 place-items-center rounded-xl bg-info-50 text-info-600 ring-1 ring-info-100">
           <UploadCloud className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[13.5px] font-semibold text-ink">Upload a business document</p>
+          <p className="text-[13.5px] font-semibold text-ink">Drop a supplier notice, invoice, or statement here</p>
           <p className="text-[12px] text-muted">
-            Drop a file here or choose a file. PDF or TXT, up to 10 MB. One file at a time.
+            PDF or TXT, up to 10 MB, one file at a time. Runway extracts the facts, verifies them against the source, and updates eligible forecasts.
           </p>
         </div>
         <span className="hidden items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-ink-soft sm:inline-flex">
           <Sparkles className="h-3 w-3" aria-hidden />
-          {all.length} documents · {totalSignals} signals extracted
+          {all.length} documents · {totalSignals} signals
         </span>
       </div>
 
       {file ? (
-        <div className="mb-4 flex items-center gap-3">
-          <span className="text-sm text-ink-soft">{file.name}</span>
-          <Button disabled={uploading} onClick={() => void upload()}>
-            {uploading ? "Uploading · processing…" : "Upload selected file"}
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-white px-4 py-3">
+          <span className="text-[13px] font-medium text-ink">{file.name}</span>
+          <span className="text-[12px] text-muted">{(file.size / 1024).toFixed(0)} KB</span>
+          <Button className="ml-auto" disabled={uploading} onClick={() => void upload()} icon={<UploadCloud className="h-4 w-4" aria-hidden />}>
+            {uploading ? "Uploading · processing…" : "Upload and analyze"}
           </Button>
         </div>
       ) : null}
@@ -250,13 +251,13 @@ export function DocumentsView() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left">
               <caption className="sr-only">Documents. Select a row to inspect or analyze it.</caption>
-              <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-muted">
+              <thead className="border-b border-line bg-slate-50/80 text-[11px] font-bold uppercase tracking-[0.08em] text-muted">
                 <tr>
-                  <th scope="col" className="px-4 py-2.5">Name</th>
-                  <th scope="col" className="px-4 py-2.5">Type</th>
-                  <th scope="col" className="px-4 py-2.5">Date added</th>
-                  <th scope="col" className="px-4 py-2.5">Status</th>
-                  <th scope="col" className="px-4 py-2.5">Signals</th>
+                  <th scope="col" className="px-5 py-3">Name</th>
+                  <th scope="col" className="px-4 py-3">Type</th>
+                  <th scope="col" className="px-4 py-3">Date added</th>
+                  <th scope="col" className="px-4 py-3">Status</th>
+                  <th scope="col" className="px-4 py-3">Signals</th>
                 </tr>
               </thead>
               <tbody>

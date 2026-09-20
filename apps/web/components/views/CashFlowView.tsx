@@ -5,7 +5,7 @@ import { ArrowDownLeft, ArrowUpRight, CalendarRange, Download } from "lucide-rea
 import Link from "next/link";
 import { useState } from "react";
 
-import { CashFlowTimelineChart } from "@/components/charts/CashFlowTimelineChart";
+import { CashFlowTimelineChart, TimelineLegend } from "@/components/charts/CashFlowTimelineChart";
 import { CashPositionChart } from "@/components/charts/CashPositionChart";
 import { MetricCard } from "@/components/domain/MetricCard";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -83,7 +83,7 @@ export function CashFlowView() {
     <div className="animate-fade-in">
       <PageHeader
         title="Cash Flow"
-        subtitle="Scheduled inflows and outflows against your minimum cash reserve."
+        subtitle="See your scheduled inflows, outflows, and projected balance against your minimum cash reserve."
         actions={
           <>
             {data ? (
@@ -106,30 +106,6 @@ export function CashFlowView() {
         </Card>
       ) : (
         <>
-          <div className="mb-5 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
-            <MetricCard label="Current cash" value={formatCents(data.current_cash_cents)} hint={`As of ${formatDateShort(data.as_of)}`} />
-            <MetricCard label="Expected inflows" value={formatSignedCents(data.expected_inflows_cents)} tone="success" hint={`${inflows.length} scheduled`} />
-            <MetricCard label="Expected outflows" value={formatSignedCents(-data.expected_outflows_cents)} tone="danger" hint={`${outflows.length} scheduled`} />
-            <MetricCard
-              label="Projected balance"
-              value={formatCents(data.projected_ending_cash_cents)}
-              tone={data.projected_ending_cash_cents < data.minimum_cash_reserve_cents ? "warning" : "success"}
-              hint={`Reserve ${formatCents(data.minimum_cash_reserve_cents)}`}
-            />
-            <MetricCard
-              label="Projected shortfall"
-              value={data.projected_shortfall_cents > 0 ? formatSignedCents(-data.projected_shortfall_cents) : "None"}
-              tone={data.projected_shortfall_cents > 0 ? "danger" : "success"}
-              hint="Gap to minimum reserve"
-            />
-            <MetricCard
-              label="Cash runway"
-              value={data.cash_runway_days != null ? `${data.cash_runway_days} days` : "—"}
-              tone={data.cash_runway_days != null && data.cash_runway_days <= 30 ? "danger" : "neutral"}
-              hint={`${formatCents(data.average_daily_net_burn_cents)} / day net burn`}
-            />
-          </div>
-
           <Tabs
             label="Cash flow views"
             value={tab}
@@ -148,9 +124,33 @@ export function CashFlowView() {
                 <CardHeader
                   title="Projected balance"
                   subtitle={`Scheduled entries over the next ${windowDays} days versus the engine's burn-rate trend.`}
+                  action={<TimelineLegend />}
                 />
                 <CashFlowTimelineChart state={data} height={300} />
               </Card>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                <MetricCard label="Current cash" value={formatCents(data.current_cash_cents)} hint={`Actual balance as of ${formatDateShort(data.as_of)}`} />
+                <MetricCard label="Expected inflows" value={formatSignedCents(data.expected_inflows_cents)} tone="success" hint={`${inflows.length} scheduled receipts in the window`} />
+                <MetricCard label="Expected outflows" value={formatSignedCents(-data.expected_outflows_cents)} tone="danger" hint={`${outflows.length} scheduled payments in the window`} />
+                <MetricCard
+                  label="Projected balance"
+                  value={formatCents(data.projected_ending_cash_cents)}
+                  tone={data.projected_ending_cash_cents < data.minimum_cash_reserve_cents ? "warning" : "success"}
+                  hint={`Minimum reserve ${formatCents(data.minimum_cash_reserve_cents)}`}
+                />
+                <MetricCard
+                  label="Projected shortfall"
+                  value={data.projected_shortfall_cents > 0 ? formatSignedCents(-data.projected_shortfall_cents) : "None"}
+                  tone={data.projected_shortfall_cents > 0 ? "danger" : "success"}
+                  hint="Gap below the minimum reserve"
+                />
+                <MetricCard
+                  label="Cash runway"
+                  value={data.cash_runway_days != null ? `${data.cash_runway_days} days` : "—"}
+                  tone={data.cash_runway_days != null && data.cash_runway_days <= 30 ? "danger" : "neutral"}
+                  hint={`${formatCents(data.average_daily_net_burn_cents)} average daily net burn`}
+                />
+              </div>
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1fr]">
                 <Card>
                   <CardHeader title="Cash position" subtitle="Where the projected balance comes from." />

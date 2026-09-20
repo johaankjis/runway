@@ -27,7 +27,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Overview", icon: Home },
+  { href: "/", label: "Home", icon: Home },
   { href: "/signals", label: "Signals", icon: Bell, badge: "signals" },
   { href: "/documents", label: "Documents", icon: FileText },
   { href: "/cash-flow", label: "Cash Flow", icon: ArrowLeftRight },
@@ -132,8 +132,8 @@ export function Sidebar() {
       </nav>
 
       <div className="p-3">
-        <div className="rounded-xl bg-white/[0.06] p-4 ring-1 ring-white/10">
-          <p className="text-[13px] font-semibold leading-snug text-white">
+        <div className="rounded-xl bg-white/[0.07] px-4 py-4 ring-1 ring-white/10">
+          <p className="text-[13.5px] font-semibold leading-snug text-white">
             A stronger tomorrow for small businesses.
           </p>
           <p className="mt-1.5 text-[11px] leading-snug text-slate-400">

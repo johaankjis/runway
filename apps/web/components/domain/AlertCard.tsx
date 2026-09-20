@@ -1,10 +1,11 @@
 "use client";
 
 import type { FinancialState, Signal } from "@runway/contracts";
-import { AlertCircle, ArrowRight, Volume2 } from "lucide-react";
+import { AlertCircle, ArrowRight, CheckCircle2, Volume2 } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/Button";
+import { cn } from "@/lib/cn";
 import { formatCents, formatDate } from "@/lib/format";
 import { effectHeadline, effectTone, impactTone, sortByImpact } from "@/lib/presentation";
 
@@ -19,27 +20,35 @@ export function AlertCard({ state, signals }: { state: FinancialState; signals: 
   return (
     <section
       aria-labelledby="alert-heading"
-      className="grid grid-cols-1 gap-6 rounded-2xl border border-danger-100 bg-white p-6 shadow-card lg:grid-cols-[1.35fr_1fr]"
+      className={cn(
+        "grid grid-cols-1 gap-6 rounded-2xl border p-6 shadow-card lg:grid-cols-[1.3fr_1fr] lg:gap-8",
+        isCritical ? "border-danger-100 bg-[#FFF5F5]" : "border-success-100 bg-success-50/60",
+      )}
     >
       <div className="flex flex-col">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-3">
           <span
             aria-hidden
-            className="grid h-8 w-8 place-items-center rounded-full bg-danger-500 text-white shadow-[0_0_0_6px_rgba(225,29,72,0.10)]"
+            className={cn(
+              "grid h-9 w-9 place-items-center rounded-full text-white",
+              isCritical ? "bg-danger-500 shadow-[0_0_0_6px_rgba(225,29,72,0.10)]" : "bg-success-500 shadow-[0_0_0_6px_rgba(16,185,129,0.12)]",
+            )}
           >
-            <AlertCircle className="h-[18px] w-[18px]" />
+            {isCritical ? <AlertCircle className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}
           </span>
-          <span className="text-[11.5px] font-bold uppercase tracking-[0.14em] text-danger-600">
+          <span
+            className={cn(
+              "text-[11.5px] font-bold uppercase tracking-[0.14em]",
+              isCritical ? "text-danger-600" : "text-success-600",
+            )}
+          >
             {isCritical ? "Cash flow alert" : "Cash flow status"}
           </span>
         </div>
 
-        <h2 id="alert-heading" className="mt-3 text-[30px] font-bold leading-tight tracking-tight text-ink">
+        <h2 id="alert-heading" className="mt-4 text-[30px] font-bold leading-[1.15] tracking-tight text-ink">
           {shortfall > 0 ? (
-            <>
-              Projected shortfall in{" "}
-              <span className="text-danger-600">{runway != null ? `${runway} days` : "the forecast window"}</span>
-            </>
+            <>Projected shortfall in {runway != null ? `${runway} days` : "the forecast window"}</>
           ) : (
             <>Cash position is on track</>
           )}
@@ -64,33 +73,34 @@ export function AlertCard({ state, signals }: { state: FinancialState; signals: 
           )}
         </p>
 
-        <div className="mt-5 flex flex-wrap items-center gap-2.5">
-          <Button href="/cash-flow" iconRight={<ArrowRight className="h-4 w-4" aria-hidden />}>
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <Button href="/cash-flow" size="lg" iconRight={<ArrowRight className="h-4 w-4" aria-hidden />}>
             View details
           </Button>
-          <Button href="/voice" variant="secondary" icon={<Volume2 className="h-4 w-4" aria-hidden />}>
+          <Button href="/voice" size="lg" variant="secondary" icon={<Volume2 className="h-4 w-4" aria-hidden />}>
             Hear summary
           </Button>
         </div>
       </div>
 
-      <div className="border-t border-line pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">Key drivers</p>
-        <ul className="mt-3 space-y-3">
+      <div className={cn("border-t pt-5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-1", isCritical ? "border-danger-100" : "border-success-100")}>
+        <p className="text-[11.5px] font-bold uppercase tracking-[0.14em] text-ink-soft">Key drivers</p>
+        <ul className="mt-3.5 space-y-3.5">
           {drivers.map((signal) => {
             const headline = effectHeadline(signal.financial_effect);
+            const tone = effectTone(signal.financial_effect) === "neutral" ? impactTone[signal.impact_level] : effectTone(signal.financial_effect);
             return (
               <li key={signal.id}>
                 <Link
                   href={`/signals/${signal.id}`}
-                  className="group -mx-2 flex items-start gap-3 rounded-lg px-2 py-1 transition-colors hover:bg-slate-50"
+                  className="group -mx-2 flex items-start gap-3 rounded-lg px-2 py-1 transition-colors hover:bg-white/70"
                 >
-                  <SignalIcon signal={signal} tone={effectTone(signal.financial_effect) === "neutral" ? impactTone[signal.impact_level] : effectTone(signal.financial_effect)} size="sm" className="mt-0.5" />
+                  <SignalIcon signal={signal} tone={tone} size="sm" className="mt-0.5 bg-white" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] font-semibold text-ink group-hover:underline">
+                    <span className="block truncate text-[13.5px] font-semibold text-ink group-hover:underline">
                       {signal.title}
                     </span>
-                    <span className="block text-[11.5px] text-muted">
+                    <span className="block text-[12px] text-muted">
                       {headline ?? signal.financial_effect.description}
                     </span>
                   </span>

@@ -1,7 +1,7 @@
 "use client";
 
 import type { Document, Signal } from "@runway/contracts";
-import { ArrowDown, FileText, Quote, ShieldCheck, Sparkles, TrendingDown } from "lucide-react";
+import { ArrowDown, ArrowRight, Calculator, FileText, Quote, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -26,12 +26,14 @@ function StepCard({
   icon,
   tone,
   children,
+  className,
 }: {
   step: string;
   title: string;
   icon: ReactNode;
   tone: "neutral" | "info" | "danger";
   children: ReactNode;
+  className?: string;
 }) {
   return (
     <div
@@ -40,13 +42,14 @@ function StepCard({
         tone === "neutral" && "border-line bg-white",
         tone === "info" && "border-info-100 bg-info-50/60",
         tone === "danger" && "border-danger-100 bg-danger-50/50",
+        className,
       )}
     >
       <div className="flex items-center gap-2.5">
         <span
           aria-hidden
           className={cn(
-            "grid h-7 w-7 place-items-center rounded-md",
+            "grid h-8 w-8 shrink-0 place-items-center rounded-lg",
             tone === "neutral" && "bg-slate-100 text-ink-soft",
             tone === "info" && "bg-info-100 text-info-600",
             tone === "danger" && "bg-danger-100 text-danger-600",
@@ -54,9 +57,11 @@ function StepCard({
         >
           {icon}
         </span>
-        <div>
+        <div className="min-w-0">
           <p className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted">{step}</p>
-          <p className="text-[13.5px] font-semibold text-ink">{title}</p>
+          <p className="truncate text-[13.5px] font-semibold text-ink" title={title}>
+            {title}
+          </p>
         </div>
       </div>
       <div className="mt-3">{children}</div>
@@ -64,19 +69,40 @@ function StepCard({
   );
 }
 
-function Connector() {
+function Connector({ horizontal }: { horizontal: boolean }) {
   return (
-    <div aria-hidden className="flex justify-center py-1 text-muted-light">
-      <ArrowDown className="h-4 w-4" />
+    <div
+      aria-hidden
+      className={cn(
+        "flex items-center justify-center text-muted-light",
+        horizontal ? "py-1 lg:px-1 lg:py-0 lg:pt-6" : "py-1",
+      )}
+    >
+      {horizontal ? (
+        <>
+          <ArrowDown className="h-4 w-4 lg:hidden" />
+          <ArrowRight className="hidden h-4 w-4 lg:block" />
+        </>
+      ) : (
+        <ArrowDown className="h-4 w-4" />
+      )}
     </div>
   );
 }
 
 /**
- * SOURCE -> EXTRACTED SIGNAL -> FINANCIAL EFFECT.
+ * SOURCE -> EXTRACTED FACT -> FINANCIAL IMPACT.
  * Makes it obvious that Runway can trace a claim back to a document excerpt.
  */
-export function ProvenanceFlow({ signal, document }: { signal: Signal; document?: Document }) {
+export function ProvenanceFlow({
+  signal,
+  document,
+  layout = "vertical",
+}: {
+  signal: Signal;
+  document?: Document;
+  layout?: "vertical" | "horizontal";
+}) {
   const evidence = signal.evidence;
   const effect = signal.financial_effect;
   const headline = effectHeadline(effect);
@@ -85,10 +111,12 @@ export function ProvenanceFlow({ signal, document }: { signal: Signal; document?
   const sourceTitle = extraction?.source_title ?? document?.title ?? signal.source_document_id;
   const filename = extraction?.source_filename ?? document?.filename ?? null;
   const checksum = extraction?.checksum_sha256 ?? document?.checksum_sha256 ?? null;
+  const horizontal = layout === "horizontal";
+
   return (
-    <div>
+    <div className={cn(horizontal && "lg:grid lg:grid-cols-[1fr_auto_1.15fr_auto_1fr] lg:items-start")}>
       <StepCard step="Source" title={sourceTitle} icon={<FileText className="h-4 w-4" />} tone="neutral">
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12px]">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[12px]">
           <dt className="text-muted">Type</dt>
           <dd className="text-ink">{document ? labelForDocumentType(document.document_type) : "Document"}</dd>
           <dt className="text-muted">Filename</dt>
@@ -113,8 +141,8 @@ export function ProvenanceFlow({ signal, document }: { signal: Signal; document?
           </p>
         ) : null}
       </StepCard>
-      <Connector />
-      <StepCard step="Extracted signal" title={signal.title} icon={<Sparkles className="h-4 w-4" />} tone="info">
+      <Connector horizontal={horizontal} />
+      <StepCard step="Extracted fact" title={signal.title} icon={<Sparkles className="h-4 w-4" />} tone="info">
         {facts ? (
           <dl className="mb-3 grid grid-cols-2 gap-2 text-[12px]">
             {[
@@ -156,15 +184,20 @@ export function ProvenanceFlow({ signal, document }: { signal: Signal; document?
           </div>
         ) : (
           <p className="mt-2 text-[11.5px] text-muted">
-            Fixture signal · run <em>Analyze document</em> on the Documents page to attach model extraction provenance.
+            Fixture signal · analyze the source document on the Documents page to attach model extraction provenance.
           </p>
         )}
       </StepCard>
-      <Connector />
-      <StepCard step="Financial effect" title={effectKindLabel[effect.kind]} icon={<TrendingDown className="h-4 w-4" />} tone={effectTone(effect) === "neutral" ? "neutral" : "danger"}>
+      <Connector horizontal={horizontal} />
+      <StepCard
+        step="Financial impact"
+        title={effectKindLabel[effect.kind]}
+        icon={<Calculator className="h-4 w-4" />}
+        tone={effectTone(effect) === "neutral" ? "neutral" : "danger"}
+      >
         <div className="flex flex-wrap items-center gap-2">
           {headline ? (
-            <span className="tabular text-[22px] font-bold tracking-tight text-ink">{headline}</span>
+            <span className="tabular text-[24px] font-bold tracking-tight text-ink">{headline}</span>
           ) : (
             <span className="text-[14px] font-semibold text-ink">Not quantified</span>
           )}
@@ -172,14 +205,15 @@ export function ProvenanceFlow({ signal, document }: { signal: Signal; document?
             {calculationStatusLabel[effect.calculation_status]}
           </Pill>
         </div>
-        <p className="mt-2 text-[12.5px] text-ink-soft">{effect.description}</p>
+        <p className="mt-2 text-[12.5px] leading-relaxed text-ink-soft">{effect.description}</p>
         {extraction && effect.calculation_status === "applied" ? (
           <p className="mt-2 text-[11.5px] font-medium text-ink-soft">
             Already in the baseline forecast. Extraction attached provenance to this signal; it did not apply the cost a
             second time.
           </p>
         ) : null}
-        <p className="mt-2 text-[11.5px] text-muted">
+        <p className="mt-2 flex items-center gap-1.5 text-[11.5px] text-muted">
+          <ShieldCheck className="h-3.5 w-3.5 text-success-600" aria-hidden />
           Calculated by the deterministic engine, not by a model.{" "}
           <Link href="/cash-flow" className="text-info-600 underline-offset-2 hover:underline">
             See forecast
@@ -233,7 +267,7 @@ export function SourceDocumentViewer({ signal, document }: { signal: Signal; doc
     const inSpan = spanLines.has(clean.trim().toLowerCase());
     if (clean.startsWith("# ")) {
       return (
-        <h3 key={index} className={cn("text-[16px] font-bold text-ink", inSpan && "-mx-2 rounded border-l-2 border-warning-500 bg-warning-50 px-2")}>
+        <h3 key={index} className={cn("mb-2 text-[18px] font-bold tracking-tight text-ink", inSpan && "-mx-2 rounded border-l-2 border-warning-500 bg-warning-50 px-2")}>
           {clean.slice(2)}
         </h3>
       );
@@ -241,21 +275,21 @@ export function SourceDocumentViewer({ signal, document }: { signal: Signal; doc
     const hit = excerpts.find((excerpt) => clean.toLowerCase().includes(excerpt.toLowerCase()));
     if (!hit && inSpan) {
       return (
-        <p key={index} className="-mx-2 rounded border-l-2 border-warning-500 bg-warning-50 px-2 text-[12.5px] leading-relaxed text-ink">
+        <p key={index} className="-mx-2 rounded border-l-2 border-warning-500 bg-warning-50 px-2 text-[13px] leading-relaxed text-ink">
           {clean}
         </p>
       );
     }
     if (!hit) {
       return (
-        <p key={index} className="text-[12.5px] leading-relaxed text-ink-soft">
+        <p key={index} className="text-[13px] leading-relaxed text-ink-soft">
           {clean}
         </p>
       );
     }
     const start = clean.toLowerCase().indexOf(hit.toLowerCase());
     return (
-      <p key={index} className="text-[12.5px] leading-relaxed text-ink">
+      <p key={index} className="text-[13px] leading-relaxed text-ink">
         {clean.slice(0, start)}
         <mark className="rounded bg-warning-100 px-0.5 font-medium ring-1 ring-warning-500/40">
           {clean.slice(start, start + hit.length)}
@@ -266,38 +300,45 @@ export function SourceDocumentViewer({ signal, document }: { signal: Signal; doc
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-white">
-      <div className="flex items-center justify-between gap-3 border-b border-line bg-slate-50 px-4 py-2.5">
-        <div className="flex min-w-0 items-center gap-2 text-[12px] text-ink-soft">
+    <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-card">
+      <div className="flex items-center justify-between gap-3 border-b border-line bg-white px-4 py-2.5">
+        <div className="flex min-w-0 items-center gap-2 text-[12.5px] text-ink-soft">
           <FileText className="h-4 w-4 shrink-0 text-muted" aria-hidden />
           <span className="truncate font-medium">{document?.filename ?? signal.source_document_id}</span>
         </div>
-        <Pill tone="neutral">{document?.source === "upload" ? "Extracted text evidence" : "Page 1 of 1"}</Pill>
+        <div className="flex shrink-0 items-center gap-2">
+          <Pill tone="warning" dot>
+            {signal.evidence.length} highlighted
+          </Pill>
+          <Pill tone="neutral">{document?.source === "upload" ? "Extracted text" : "Page 1 of 1"}</Pill>
+        </div>
       </div>
-      <div className="scrollbar-thin max-h-[440px] space-y-1 overflow-y-auto bg-[#FCFCFB] p-5">
-        {content === undefined ? (
-          <div className="space-y-2.5">
-            <Skeleton className="h-5 w-1/2" />
-            <Skeleton className="h-3.5 w-1/3" />
-            <Skeleton className="h-3.5 w-full" />
-            <Skeleton className="h-3.5 w-11/12" />
-            <Skeleton className="h-3.5 w-4/5" />
-          </div>
-        ) : content === null ? (
-          <div>
-            <p className="text-[12.5px] text-muted">{document?.source === "upload" ? "Exact evidence from the parsed upload. PDF text order may differ from the page layout." : "Full document text is unavailable in this environment."}</p>
-            <ul className="mt-3 space-y-2">
-              {signal.evidence.map((item) => (
-                <li key={item.id} className="whitespace-pre-wrap text-[13px] text-ink">
-                  “<mark className="rounded bg-warning-100 px-0.5">{item.excerpt}</mark>”
-                  <span className="block text-[11.5px] text-muted">{item.locator}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : (
-          lines.map(renderLine)
-        )}
+      <div className="scrollbar-thin max-h-[480px] overflow-y-auto bg-slate-100/80 p-4 sm:p-5">
+        <div className="mx-auto min-h-[280px] max-w-[640px] space-y-1 rounded-md bg-white px-6 py-7 shadow-[0_1px_3px_rgba(15,27,49,0.08),0_8px_24px_rgba(15,27,49,0.06)] sm:px-8 sm:py-8">
+          {content === undefined ? (
+            <div className="space-y-2.5">
+              <Skeleton className="h-5 w-1/2" />
+              <Skeleton className="h-3.5 w-1/3" />
+              <Skeleton className="h-3.5 w-full" />
+              <Skeleton className="h-3.5 w-11/12" />
+              <Skeleton className="h-3.5 w-4/5" />
+            </div>
+          ) : content === null ? (
+            <div>
+              <p className="text-[12.5px] text-muted">{document?.source === "upload" ? "Exact evidence from the parsed upload. PDF text order may differ from the page layout." : "Full document text is unavailable in this environment."}</p>
+              <ul className="mt-3 space-y-2">
+                {signal.evidence.map((item) => (
+                  <li key={item.id} className="whitespace-pre-wrap text-[13px] text-ink">
+                    “<mark className="rounded bg-warning-100 px-0.5">{item.excerpt}</mark>”
+                    <span className="block text-[11.5px] text-muted">{item.locator}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            lines.map(renderLine)
+          )}
+        </div>
       </div>
     </div>
   );

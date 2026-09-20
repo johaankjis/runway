@@ -1,7 +1,7 @@
 "use client";
 
 import type { VoiceLanguage, VoiceResponse } from "@runway/contracts";
-import { AlertTriangle, ArrowRight, FlaskConical, Quote, SlidersHorizontal } from "lucide-react";
+import { AlertTriangle, ArrowRight, ChevronDown, FlaskConical, Globe, Quote, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -151,55 +151,58 @@ export function VoiceView() {
   return (
     <div className="animate-fade-in">
       <PageHeader
-        title={
-          <span className="inline-flex items-center gap-2.5">
-            Talk to Runway <Pill tone="info">Beta</Pill>
-          </span>
-        }
+        title="Talk to Runway"
         subtitle="Grounded briefings spoken from your calculated cash position. Nothing here is invented by a model."
+        actions={<Pill tone="info">Beta</Pill>}
       />
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.35fr_1fr]">
-        <div className="space-y-6">
-          <label className="flex items-center gap-3 text-[13px] font-semibold text-ink">
-            Briefing language
-            <select
-              value={language}
-              disabled={phase === "generating"}
-              onChange={(event) => {
-                setLanguage(event.target.value as VoiceLanguage);
-                audioRef.current?.pause();
-                setPlaying(false);
-                releaseAudio();
-                setBriefing(null);
-                setPhase("idle");
-                setError(null);
-              }}
-              className="rounded-lg border border-line bg-white px-3 py-2 text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-info-500"
-            >
-              <option value="en">English</option>
-              <option value="es">Español</option>
-              <option value="fr">Français</option>
-              <option value="hi">हिन्दी</option>
-              <option value="ar">العربية</option>
-            </select>
-          </label>
-          <VoiceAssistantPanel
-            status={status}
-            onPrimary={onPrimary}
-            primaryLabel={primaryLabel}
-            prompts={VOICE_PROMPTS}
-            activePromptId={activePrompt?.id ?? null}
-            onPrompt={(prompt) => void generate(prompt)}
-            footer={
-              briefing ? (
-                <span>{providerDescription(briefing.response.provider, "voice")}</span>
-              ) : (
-                <span>Briefing text is composed by the deterministic engine; ElevenLabs speaks it when a live voice provider is configured.</span>
-              )
-            }
-          />
+      <div className="space-y-6">
+        <VoiceAssistantPanel
+          status={status}
+          onPrimary={onPrimary}
+          primaryLabel={primaryLabel}
+          prompts={VOICE_PROMPTS}
+          activePromptId={activePrompt?.id ?? null}
+          onPrompt={(prompt) => void generate(prompt)}
+          languageControl={
+            <label className="relative inline-flex items-center gap-2 rounded-full border border-line-strong bg-white pl-3 pr-2 text-[12.5px] font-medium text-ink shadow-sm focus-within:border-info-500">
+              <Globe className="h-3.5 w-3.5 text-muted" aria-hidden />
+              <span className="sr-only">Briefing language</span>
+              <select
+                value={language}
+                disabled={phase === "generating"}
+                onChange={(event) => {
+                  setLanguage(event.target.value as VoiceLanguage);
+                  audioRef.current?.pause();
+                  setPlaying(false);
+                  releaseAudio();
+                  setBriefing(null);
+                  setPhase("idle");
+                  setError(null);
+                }}
+                className="select-plain h-8 cursor-pointer bg-transparent pr-6 text-[12.5px] font-medium text-ink focus:outline-none disabled:cursor-not-allowed"
+              >
+                <option value="en">English</option>
+                <option value="es">Español</option>
+                <option value="fr">Français</option>
+                <option value="hi">हिन्दी</option>
+                <option value="ar">العربية</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2.5 h-3.5 w-3.5 text-muted" aria-hidden />
+            </label>
+          }
+          footer={
+            briefing ? (
+              <span>{providerDescription(briefing.response.provider, "voice")}</span>
+            ) : (
+              <span>
+                Powered by ElevenLabs · Briefing text is composed by the deterministic engine; ElevenLabs speaks it when a live voice provider is configured.
+              </span>
+            )
+          }
+        />
 
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr_1fr]">
           <Card>
             <CardHeader
               title="Briefing"
@@ -316,45 +319,45 @@ export function VoiceView() {
               </p>
             )}
           </Card>
-        </div>
 
-        <div className="space-y-6">
-          <Card>
-            <CardHeader title="Financial context" subtitle="What Runway speaks from." />
-            {contextState ? (
-              <dl className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "Cash runway", value: contextState.cash_runway_days != null ? `${contextState.cash_runway_days} days` : "—", tone: "text-danger-600" },
-                  { label: "Projected shortfall", value: contextState.projected_shortfall_cents > 0 ? formatCents(contextState.projected_shortfall_cents) : "None", tone: "text-danger-600" },
-                  { label: "Current cash", value: formatCents(contextState.current_cash_cents), tone: "text-ink" },
-                  { label: "Projected balance", value: formatCents(contextState.projected_ending_cash_cents), tone: "text-ink" },
-                ].map((item) => (
-                  <div key={item.label} className="rounded-lg bg-canvas p-3">
-                    <dt className="text-[11.5px] text-muted">{item.label}</dt>
-                    <dd className={`tabular mt-0.5 text-[18px] font-bold tracking-tight ${item.tone}`}>{item.value}</dd>
-                  </div>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader title="Financial context" subtitle="What Runway speaks from." />
+              {contextState ? (
+                <dl className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: "Cash runway", value: contextState.cash_runway_days != null ? `${contextState.cash_runway_days} days` : "—", tone: "text-danger-600" },
+                    { label: "Projected shortfall", value: contextState.projected_shortfall_cents > 0 ? formatCents(contextState.projected_shortfall_cents) : "None", tone: "text-danger-600" },
+                    { label: "Current cash", value: formatCents(contextState.current_cash_cents), tone: "text-ink" },
+                    { label: "Projected balance", value: formatCents(contextState.projected_ending_cash_cents), tone: "text-ink" },
+                  ].map((item) => (
+                    <div key={item.label} className="rounded-lg bg-canvas p-3">
+                      <dt className="text-[11.5px] text-muted">{item.label}</dt>
+                      <dd className={`tabular mt-0.5 text-[18px] font-bold tracking-tight ${item.tone}`}>{item.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : state.error ? (
+                <ErrorState title="Could not load financial state" error={state.error} onRetry={state.refetch} />
+              ) : (
+                <LoadingState lines={3} />
+              )}
+            </Card>
+            <Card>
+              <CardHeader title="Top signals" subtitle={business.data ? `Active for ${business.data.name}` : undefined} />
+              <ul className="space-y-2.5">
+                {topSignals.map((signal) => (
+                  <li key={signal.id} className="text-[13px]">
+                    <Link href={`/signals/${signal.id}`} className="font-semibold text-ink hover:underline">
+                      {signal.title}
+                    </Link>
+                    <p className="text-[12px] text-muted">{signal.description}</p>
+                  </li>
                 ))}
-              </dl>
-            ) : state.error ? (
-              <ErrorState title="Could not load financial state" error={state.error} onRetry={state.refetch} />
-            ) : (
-              <LoadingState lines={3} />
-            )}
-          </Card>
-          <Card>
-            <CardHeader title="Top signals" subtitle={business.data ? `Active for ${business.data.name}` : undefined} />
-            <ul className="space-y-2.5">
-              {topSignals.map((signal) => (
-                <li key={signal.id} className="text-[13px]">
-                  <Link href={`/signals/${signal.id}`} className="font-semibold text-ink hover:underline">
-                    {signal.title}
-                  </Link>
-                  <p className="text-[12px] text-muted">{signal.description}</p>
-                </li>
-              ))}
-              {!signals.data ? <LoadingState lines={3} /> : null}
-            </ul>
-          </Card>
+                {!signals.data ? <LoadingState lines={3} /> : null}
+              </ul>
+            </Card>
+          </div>
         </div>
       </div>
     </div>

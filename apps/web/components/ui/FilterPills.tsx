@@ -8,19 +8,27 @@ export interface FilterOption<K extends string> {
   count?: number;
 }
 
+/**
+ * Segmented filter pills: the active option is a solid navy pill, the rest sit
+ * on a soft gray fill. Used for list filters and lightweight mode switches.
+ */
 export function FilterPills<K extends string>({
   options,
   value,
   onChange,
   label,
+  size = "md",
+  className,
 }: {
   options: FilterOption<K>[];
   value: K;
   onChange: (key: K) => void;
   label: string;
+  size?: "sm" | "md";
+  className?: string;
 }) {
   return (
-    <div role="group" aria-label={label} className="flex flex-wrap items-center gap-1.5">
+    <div role="group" aria-label={label} className={cn("flex flex-wrap items-center gap-2", className)}>
       {options.map((option) => {
         const active = option.key === value;
         return (
@@ -30,15 +38,16 @@ export function FilterPills<K extends string>({
             aria-pressed={active}
             onClick={() => onChange(option.key)}
             className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors",
+              "inline-flex items-center gap-1 rounded-full font-semibold transition-colors",
+              size === "sm" ? "h-7 px-3 text-[12px]" : "h-8 px-3.5 text-[12.5px]",
               active
-                ? "border-navy-900 bg-navy-900 text-white"
-                : "border-line-strong bg-white text-ink-soft hover:border-navy-600 hover:text-ink",
+                ? "bg-navy-900 text-white shadow-sm"
+                : "bg-slate-100 text-ink-soft hover:bg-slate-200/80 hover:text-ink",
             )}
           >
             {option.label}
             {option.count != null ? (
-              <span className={cn("tabular", active ? "text-white/70" : "text-muted")}>
+              <span className={cn("tabular font-medium", active ? "text-white/75" : "text-muted")}>
                 ({option.count})
               </span>
             ) : null}

@@ -17,7 +17,7 @@ export const impactTone: Record<ImpactLevel, Tone> = {
   critical: "danger",
   high: "danger",
   medium: "warning",
-  low: "neutral",
+  low: "info",
 };
 
 export const impactLabel: Record<ImpactLevel, string> = {
@@ -52,10 +52,16 @@ export const categoryLabel: Record<string, string> = {
   revenue: "Revenue",
   payroll: "Payroll",
   customer_risk: "Customer risk",
+  suppliers: "Supplier costs",
 };
 
+function humanize(value: string): string {
+  const text = value.replace(/_/g, " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export function labelForCategory(category: string): string {
-  return categoryLabel[category] ?? category.replace(/_/g, " ");
+  return categoryLabel[category] ?? humanize(category);
 }
 
 export const effectKindLabel: Record<FinancialEffect["kind"], string> = {
@@ -148,10 +154,11 @@ export const documentTypeLabel: Record<string, string> = {
   sales_report: "Sales report",
   payroll_schedule: "Payroll schedule",
   customer_update: "Customer update",
+  uploaded_document: "Uploaded document",
 };
 
 export function labelForDocumentType(type: string): string {
-  return documentTypeLabel[type] ?? type.replace(/_/g, " ");
+  return documentTypeLabel[type] ?? humanize(type);
 }
 
 export type DocumentFilter = "all" | "invoice" | "supplier_notice" | "sales_report" | "other";

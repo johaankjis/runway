@@ -7,7 +7,6 @@ import { useState } from "react";
 import { ProviderBadge, ProviderNote } from "@/components/domain/ProviderBadge";
 import { SignalIcon } from "@/components/domain/SignalIcon";
 import { ProvenanceFlow, SourceDocumentViewer } from "@/components/domain/SourceEvidence";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { ImpactBadge, Pill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -30,8 +29,8 @@ type Tab = "summary" | "source" | "extracted" | "impact";
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">{label}</p>
-      <div className="mt-1 text-[13.5px] leading-relaxed text-ink">{children}</div>
+      <p className="text-[14.5px] font-bold tracking-tight text-ink">{label}</p>
+      <div className="mt-1 text-[13.5px] leading-relaxed text-ink-soft">{children}</div>
     </div>
   );
 }
@@ -90,27 +89,27 @@ export function SignalDetailView({ id }: { id: string }) {
         </Button>
       </div>
 
-      <PageHeader
-        eyebrow={
-          <div className="flex items-center gap-3">
-            <SignalIcon signal={data} tone={impactTone[data.impact_level]} size="lg" />
-            <div className="flex flex-wrap items-center gap-2">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-4">
+          <SignalIcon signal={data} tone={impactTone[data.impact_level]} size="xl" />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <h1 className="text-[26px] font-bold leading-tight tracking-tight text-ink">{data.title}</h1>
               <ImpactBadge level={data.impact_level} />
+            </div>
+            <p className="mt-1 text-[13.5px] text-muted">
+              Detected in{" "}
+              <span className="font-medium text-ink">{document?.filename ?? data.source_document_id}</span> ·{" "}
+              {formatDateTime(data.detected_at)}
+            </p>
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
               <Pill tone="neutral">{labelForCategory(data.category)}</Pill>
               <Pill tone="info">Confidence {formatConfidence(data.confidence)}</Pill>
               {extraction ? <ProviderBadge meta={extraction.provider} kind="extraction" /> : null}
             </div>
           </div>
-        }
-        title={data.title}
-        subtitle={
-          <>
-            Detected in{" "}
-            <span className="font-medium text-ink">{document?.filename ?? data.source_document_id}</span> ·{" "}
-            {formatDateTime(data.detected_at)}
-          </>
-        }
-      />
+        </div>
+      </div>
 
       <Tabs
         label="Signal sections"
@@ -126,16 +125,16 @@ export function SignalDetailView({ id }: { id: string }) {
       />
 
       {tab === "summary" ? (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1.1fr]">
-          <Card className="space-y-5">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1.15fr]">
+          <Card className="space-y-6 self-start">
             <Field label="What happened?">{data.description}</Field>
             <Field label="Why it matters">
               {effect.description}
               {headline ? (
-                <span className="mt-2 block tabular text-[20px] font-bold tracking-tight text-ink">{headline}</span>
+                <span className="mt-2 block tabular text-[22px] font-bold tracking-tight text-ink">{headline}</span>
               ) : null}
             </Field>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-5">
               <Field label="Category">{labelForCategory(data.category)}</Field>
               <Field label="Confidence">{formatConfidence(data.confidence)}</Field>
               <Field label="Detected">{formatDateTime(data.detected_at)}</Field>
@@ -268,21 +267,18 @@ export function SignalDetailView({ id }: { id: string }) {
       ) : null}
 
       {tab === "summary" ? (
-        <section aria-labelledby="provenance-heading" className="mt-6">
-          <h2 id="provenance-heading" className="mb-3 text-[15px] font-semibold text-ink">
-            Provenance
-          </h2>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1.1fr]">
-            <ProvenanceFlow signal={data} document={document} />
-            <Card tone="info" className="self-start">
-              <p className="text-[13px] font-semibold text-ink">Why this matters for trust</p>
-              <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-soft">
-                Runway never asks you to take an AI claim on faith. Each signal points to a specific excerpt and
-                locator in a source document, and the financial effect is computed by the deterministic engine,
-                not by a language model.
+        <section aria-labelledby="provenance-heading" className="mt-7">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 id="provenance-heading" className="text-[16px] font-bold tracking-tight text-ink">
+                Where this number comes from
+              </h2>
+              <p className="mt-0.5 text-[12.5px] text-muted">
+                Source document → extracted fact → deterministic financial impact. Nothing here is taken on faith.
               </p>
-            </Card>
+            </div>
           </div>
+          <ProvenanceFlow signal={data} document={document} layout="horizontal" />
         </section>
       ) : null}
     </div>

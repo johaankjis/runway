@@ -20,7 +20,7 @@ export function Card({
       className={cn(
         "rounded-2xl border bg-white shadow-card",
         tone === "default" && "border-line",
-        tone === "danger" && "border-danger-100 bg-danger-50/40",
+        tone === "danger" && "border-danger-100 bg-danger-50/60",
         tone === "info" && "border-info-100 bg-info-50/60",
         padded && "p-5",
         interactive && "transition-shadow hover:shadow-card-hover",
