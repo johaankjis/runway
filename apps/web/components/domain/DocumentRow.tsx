@@ -1,7 +1,7 @@
 "use client";
 
 import type { Document, ProviderMetadata } from "@runway/contracts";
-import { CheckCircle2, FileText, Sparkles } from "lucide-react";
+import { CheckCircle2, FileText, Loader2, Sparkles } from "lucide-react";
 import Link from "next/link";
 
 import { CountBadge, Pill } from "@/components/ui/Badge";
@@ -19,10 +19,18 @@ import { providerDisplayName } from "@/lib/providers";
  */
 export type DocumentAnalysisStatus =
   | { kind: "analyzed"; provider: ProviderMetadata }
+  | { kind: "analyzing" }
+  | { kind: "error" }
   | { kind: "ready" }
   | { kind: "processed" };
 
 export function DocumentStatusPill({ status }: { status: DocumentAnalysisStatus }) {
+  if (status.kind === "analyzing") {
+    return <Pill tone="info" icon={<Loader2 className="h-3 w-3 animate-spin" aria-hidden />}>Analyzing and validating…</Pill>;
+  }
+  if (status.kind === "error") {
+    return <Pill tone="warning">Saved · analysis needs attention</Pill>;
+  }
   if (status.kind === "analyzed") {
     const mode = status.provider.mode;
     return (

@@ -16,12 +16,12 @@ import { Card, CardHeader } from "@/components/ui/Card";
 import { ErrorState, LoadingState, Skeleton } from "@/components/ui/States";
 import { invalidateApiCache, useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
-import { daysBetween, formatCents, formatDate, formatSignedCents } from "@/lib/format";
+import { daysBetween, formatCents, formatDate, formatDateTime } from "@/lib/format";
 import { sortByImpact } from "@/lib/presentation";
 
 export function HomeView() {
   const business = useApi("business", api.getBusiness);
-  const state = useApi("financial-state", api.getFinancialState);
+  const state = useApi("financial-state", api.getFinancialState, { revalidate: true });
   const signals = useApi("signals", api.getSignals);
   const documents = useApi("documents", api.getDocuments);
   const recommendations = useApi("recommendations", api.getRecommendations);
@@ -53,6 +53,9 @@ export function HomeView() {
     }
   };
 
+  const latest = state.data?.forecast_adjustments?.at(-1);
+  const exactMoney = (cents: number) => (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+
   const horizon = state.data ? Math.max(daysBetween(state.data.as_of, state.data.forecast_end_date), (state.data.cash_runway_days ?? 0) + 2) : 30;
 
   return (
@@ -77,6 +80,19 @@ export function HomeView() {
         }
       />
 
+      {latest ? (
+        <Card className="border-info-100 bg-info-50/60" aria-live="polite">
+          <p className="text-xs font-bold uppercase tracking-widest text-info-600">Forecast updated</p>
+          <p className="mt-1 font-semibold text-ink">{latest.entity} surcharge incorporated</p>
+          <p className="mt-1 text-sm text-ink-soft">+{exactMoney(latest.monthly_amount_cents)}/month · +{exactMoney(latest.amount_cents)} in this forecast</p>
+          <p className="mt-1 text-xs text-muted">Effective {formatDate(latest.effective_date)} · Source: {latest.source_filename} · Updated {formatDateTime(latest.applied_at)}</p>
+          <details className="mt-2 text-xs text-ink-soft">
+            <summary className="cursor-pointer">How this was calculated</summary>
+            <p className="mt-2">{latest.calculation_explanation}</p>
+          </details>
+        </Card>
+      ) : null}
+
       {resetError ? <ErrorState title="Reset failed" error={resetError} /> : null}
 
       {state.error ? (
@@ -94,7 +110,7 @@ export function HomeView() {
           <CardHeader
             title={
               <span className="inline-flex items-center gap-1.5">
-                Cash Runway
+                Forecast · Cash Runway
                 <Info className="h-3.5 w-3.5 text-muted-light" aria-label="Days until cash reaches zero at the current burn rate" />
               </span>
             }
@@ -143,16 +159,17 @@ export function HomeView() {
           />
           {state.data ? (
             <>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <InlineStat label="Current cash" value={formatCents(state.data.current_cash_cents)} />
-                <InlineStat label="Expected inflows" value={formatSignedCents(state.data.expected_inflows_cents)} tone="success" />
-                <InlineStat label="Expected outflows" value={formatSignedCents(-state.data.expected_outflows_cents)} tone="danger" />
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                <InlineStat label="Actual · Current cash" value={exactMoney(state.data.current_cash_cents)} />
+                <InlineStat label="Forecast · Expected inflows" value={exactMoney(state.data.expected_inflows_cents)} tone="success" />
+                <InlineStat label="Forecast · Expected outflows" value={exactMoney(state.data.expected_outflows_cents)} tone="danger" />
+                <InlineStat label="Forecast · Ending cash" value={exactMoney(state.data.projected_ending_cash_cents)} />
                 <InlineStat
-                  label={state.data.projected_shortfall_cents > 0 ? "Projected shortfall" : "Projected balance"}
+                  label={state.data.projected_shortfall_cents > 0 ? "Forecast · Shortfall" : "Forecast · Balance"}
                   value={
                     state.data.projected_shortfall_cents > 0
-                      ? formatSignedCents(-state.data.projected_shortfall_cents)
-                      : formatCents(state.data.projected_ending_cash_cents)
+                      ? exactMoney(state.data.projected_shortfall_cents)
+                      : exactMoney(state.data.projected_ending_cash_cents)
                   }
                   tone={state.data.projected_shortfall_cents > 0 ? "danger" : "success"}
                 />

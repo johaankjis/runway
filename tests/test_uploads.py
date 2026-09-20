@@ -128,22 +128,24 @@ def test_single_file_only(client):
     assert client.post("/api/documents/upload").status_code == 422
 
 
-def test_freshfields_proposed_deterministic_and_idempotent(client):
+def test_freshfields_incorporated_deterministic_and_idempotent(client):
     baseline = client.get("/api/financial-state").json()
     doc = upload(client).json()
     first = analyze(client, doc)
     assert first.status_code == 200
     body = first.json()
     signal = body["signal"]
-    assert body["application_status"] == "proposed"
-    assert signal["disposition"] == "proposed"
-    assert signal["financial_effect"]["calculation_status"] == "observed"
+    assert body["application_status"] == "incorporated"
+    assert signal["disposition"] == "incorporated"
+    assert signal["financial_effect"]["calculation_status"] == "applied"
     assert signal["financial_effect"]["amount_cents"] == 56117
     assert signal["extraction"]["attributes"]["weekly_spend_usd"] == 1850
     assert signal["extraction"]["attributes"]["monthly_increase_usd"] is None
     assert signal["extraction"]["provider"]["mode"] == "fixture"
     assert analyze(client, doc).json() == body
-    assert body["financial_state"] == baseline == client.get("/api/financial-state").json()
+    assert body["financial_state"] == client.get("/api/financial-state").json()
+    assert body["financial_state"]["current_cash_cents"] == baseline["current_cash_cents"]
+    assert len(body["financial_state"]["forecast_adjustments"]) == 1
     saved_doc = next(
         item for item in client.get("/api/documents").json() if item["id"] == doc["id"]
     )
@@ -214,6 +216,12 @@ def test_uploaded_live_provider_and_verified_fallback(repository, monkeypatch, f
             "fallback" if failure else "live"
         )
         assert body["signal"]["financial_effect"]["amount_cents"] == 56117
+        if failure in {"evidence", "amount", "arithmetic"}:
+            assert body["application_status"] == "proposed"
+            assert body["financial_state"]["forecast_adjustments"] == []
+            assert body["financial_state"]["expected_outflows_cents"] == 5170000
+        else:
+            assert body["application_status"] == "incorporated"
         assert body["signal"]["evidence"][0]["excerpt"] in FRESHFIELDS.decode()
         assert "private provider details" not in json.dumps(body)
         assert analyze(client, doc).json() == body
@@ -266,7 +274,12 @@ def test_upload_contract_schema(client):
     statuses = schema["components"]["schemas"]["ExtractionResponse"]["properties"][
         "application_status"
     ]["enum"]
-    assert set(statuses) == {"already_in_baseline", "proposed", "potential_duplicate"}
+    assert set(statuses) == {
+        "already_in_baseline",
+        "proposed",
+        "potential_duplicate",
+        "incorporated",
+    }
 
 
 @pytest.mark.parametrize(
@@ -377,3 +390,4 @@ def test_captured_freshfields_pdf_response(repository, monkeypatch, change):
         assert analyze(client, doc).json() == body
         assert len(calls) == 1
         assert repository.get_financial_state() == baseline
+

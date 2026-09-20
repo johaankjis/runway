@@ -1,10 +1,10 @@
 "use client";
 
-import type { Document, ExtractionResponse, Signal } from "@runway/contracts";
+import type { Document, Signal } from "@runway/contracts";
 import { Sparkles, Upload, UploadCloud } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type DragEvent } from "react";
 
-import { DocumentAnalysisPanel, type AnalysisRun } from "@/components/domain/DocumentAnalysisPanel";
+import { DocumentAnalysisPanel } from "@/components/domain/DocumentAnalysisPanel";
 import { DocumentRow, type DocumentAnalysisStatus } from "@/components/domain/DocumentRow";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -14,12 +14,28 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
 import { invalidateApiCache, primeApiCache, useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { createDocumentWorkflow, type AnalysisRun } from "@/lib/document-workflow";
 import { matchesDocumentFilter, type DocumentFilter } from "@/lib/presentation";
 
 /** The backend's extraction grammar currently covers supplier pricing notices. */
 const EXTRACTABLE_TYPES = new Set(["supplier_notice", "uploaded_document"]);
 
-function statusFor(document: Document, related: Signal[]): DocumentAnalysisStatus {
+const workflow = createDocumentWorkflow(api, (response) => {
+  primeApiCache(`signal:${response.signal.id}`, response.signal);
+  primeApiCache("financial-state", response.financial_state);
+  invalidateApiCache("signals");
+  invalidateApiCache("documents");
+  invalidateApiCache("recommendations");
+});
+const emptyRuns: Record<string, AnalysisRun> = {};
+const serverSnapshot = () => emptyRuns;
+
+function statusFor(document: Document, related: Signal[], run?: AnalysisRun): DocumentAnalysisStatus {
+  if (run?.status === "analyzing") return { kind: "analyzing" };
+  if (run?.status === "error") return { kind: "error" };
+  if (run?.status === "success" && run.response.signal.extraction) {
+    return { kind: "analyzed", provider: run.response.signal.extraction.provider };
+  }
   const extracted = related.find((signal) => signal.extraction);
   if (extracted?.extraction) return { kind: "analyzed", provider: extracted.extraction.provider };
   if (EXTRACTABLE_TYPES.has(document.document_type)) return { kind: "ready" };
@@ -27,7 +43,7 @@ function statusFor(document: Document, related: Signal[]): DocumentAnalysisStatu
 }
 
 export function DocumentsView() {
-  const documents = useApi("documents", api.getDocuments);
+  const documents = useApi("documents", api.getDocuments, { revalidate: true });
   const signals = useApi("signals", api.getSignals, { revalidate: true });
   const [filter, setFilter] = useState<DocumentFilter>("all");
   const [dragging, setDragging] = useState(false);
@@ -37,7 +53,7 @@ export function DocumentsView() {
   const [uploaded, setUploaded] = useState<Document[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [runs, setRuns] = useState<Record<string, AnalysisRun>>({});
+  const runs = useSyncExternalStore(workflow.subscribe, workflow.getSnapshot, serverSnapshot);
   const refetchSignals = signals.refetch;
   const refetchDocuments = documents.refetch;
   const inputRef = useRef<HTMLInputElement>(null);
@@ -59,29 +75,11 @@ export function DocumentsView() {
   const activeId = selectedId && all.some((doc) => doc.id === selectedId) ? selectedId : defaultId;
   const selected = all.find((doc) => doc.id === activeId) ?? null;
 
-  const analyze = useCallback(
-    async (documentId: string) => {
-      setRuns((prev) => ({ ...prev, [documentId]: { status: "analyzing" } }));
-      try {
-        const response: ExtractionResponse = await api.extractDocument(documentId);
-        // Persisted provenance must flow through the existing signal APIs, so
-        // seed the caches with what the backend returned and refetch the list.
-        primeApiCache(`signal:${response.signal.id}`, response.signal);
-        primeApiCache("financial-state", response.financial_state);
-        invalidateApiCache("signals");
-        invalidateApiCache("recommendations");
-        setRuns((prev) => ({ ...prev, [documentId]: { status: "success", response } }));
-        refetchSignals();
-        refetchDocuments();
-      } catch (error) {
-        setRuns((prev) => ({
-          ...prev,
-          [documentId]: { status: "error", error: error instanceof Error ? error : new Error(String(error)) },
-        }));
-      }
-    },
-    [refetchSignals, refetchDocuments],
-  );
+  useEffect(() => {
+    // Refetch read-only lists when a request finishes, including after navigation.
+    refetchSignals();
+    refetchDocuments();
+  }, [runs, refetchSignals, refetchDocuments]);
 
   useEffect(() => {
     if (selectedId) panelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -114,14 +112,22 @@ export function DocumentsView() {
     setUploading(true);
     setNotice(`Uploading ${file.name} → processing document text…`);
     try {
-      const document = await api.uploadDocument(file);
-      setUploaded((previous) => [document, ...previous]);
-      invalidateApiCache("documents");
-      documents.refetch();
-      setSelectedId(document.id);
-      setFilter("all");
-      setFile(null);
-      setNotice(`${document.filename} uploaded → text extracted. Select Analyze document below to discover a signal using the configured Nemotron/fixture provider.`);
+      const { document, run } = await workflow.upload(file, (document) => {
+        setUploaded((previous) => [document, ...previous]);
+        invalidateApiCache("documents");
+        documents.refetch();
+        setSelectedId(document.id);
+        setFilter("all");
+        setFile(null);
+        setNotice(`${document.filename} saved. Analyzing and validating source evidence with the configured provider (Nemotron in live mode)… Eligible effects will update the forecast automatically.`);
+      });
+      setNotice(run.status === "error"
+        ? `${document.filename} was saved, but analysis could not complete. Review the details below and retry analysis; you do not need to upload again.`
+        : run.status === "success" && run.response.application_status === "incorporated"
+          ? `${document.filename} analyzed. Validated supplier costs are incorporated into the forecast. Current cash is unchanged.`
+          : run.status === "success" && run.response.application_status === "potential_duplicate"
+            ? `${document.filename} analyzed. Matching information already exists; no additional forecast adjustment was applied.`
+            : `${document.filename} analyzed. Review the result below; no new forecast adjustment was applied.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Upload failed. Try again.");
     } finally {
@@ -140,9 +146,9 @@ export function DocumentsView() {
     <div className="animate-fade-in">
       <PageHeader
         title="Documents"
-        subtitle="Select a document and let Runway extract a structured signal with traceable evidence."
+        subtitle="Upload a document. Runway automatically analyzes its evidence and updates eligible forecasts."
         actions={
-          <Button variant="secondary" onClick={() => inputRef.current?.click()} icon={<Upload className="h-4 w-4" aria-hidden />}>
+          <Button variant="secondary" disabled={uploading} onClick={() => inputRef.current?.click()} icon={<Upload className="h-4 w-4" aria-hidden />}>
             Upload document
           </Button>
         }
@@ -258,7 +264,7 @@ export function DocumentsView() {
                   <DocumentRow
                     key={doc.id}
                     document={doc}
-                    status={statusFor(doc, signalsByDocument.get(doc.id) ?? [])}
+                    status={statusFor(doc, signalsByDocument.get(doc.id) ?? [], runs[doc.id])}
                     selected={doc.id === activeId}
                     onSelect={() => setSelectedId(doc.id)}
                   />
@@ -273,10 +279,10 @@ export function DocumentsView() {
         <div ref={panelRef} className="mt-5">
           <DocumentAnalysisPanel
             document={selected}
-            status={statusFor(selected, signalsByDocument.get(selected.id) ?? [])}
+            status={statusFor(selected, signalsByDocument.get(selected.id) ?? [], runs[selected.id])}
             relatedSignals={signalsByDocument.get(selected.id) ?? []}
             run={runs[selected.id] ?? { status: "idle" }}
-            onAnalyze={() => void analyze(selected.id)}
+            onAnalyze={() => { setNotice(null); void workflow.analyze(selected.id); }}
           />
         </div>
       ) : null}
