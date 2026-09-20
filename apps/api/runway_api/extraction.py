@@ -57,24 +57,37 @@ class NemotronSignalExtractor:
         settings = self.settings
         if not settings.nvidia_api_key.get_secret_value():
             raise ProviderFailure("missing_credentials")
+        payload = {
+            "model": settings.nvidia_model,
+            "stream": False,
+            "temperature": 0,
+            "max_tokens": 2048,
+            "messages": extraction_messages(document.id, content),
+        }
+        if httpx.URL(settings.nvidia_base_url).host == "openrouter.ai":
+            # Bounded fact extraction needs final JSON, not a reasoning trace that
+            # can exhaust the output budget. This option is OpenRouter-specific.
+            payload["reasoning"] = {"enabled": False}
         with httpx.Client(timeout=settings.nvidia_timeout_seconds) as client:
             response = client.post(
                 f"{settings.nvidia_base_url.rstrip('/')}/chat/completions",
                 headers={"Authorization": f"Bearer {settings.nvidia_api_key.get_secret_value()}"},
-                json={
-                    "model": settings.nvidia_model,
-                    "stream": False,
-                    "temperature": 0,
-                    "max_tokens": 2048,
-                    "messages": extraction_messages(document.id, content),
-                },
+                json=payload,
             )
             response.raise_for_status()
         try:
             choice = response.json()["choices"][0]
             if choice["finish_reason"] != "stop":
                 raise ValueError("Incomplete response")
-            return SupplierFacts.model_validate_json(choice["message"]["content"])
+            facts = SupplierFacts.model_validate_json(choice["message"]["content"])
+            # Models may lose Markdown's trailing spaces when copying the document.
+            # Restore source bytes only for a full-document match differing solely
+            # in horizontal whitespace at line ends. Never repair words or facts.
+            if facts.excerpt != content and re.sub(
+                r"[ \t]+$", "", facts.excerpt, flags=re.MULTILINE
+            ) == re.sub(r"[ \t]+$", "", content, flags=re.MULTILINE):
+                facts.excerpt = content
+            return facts
         except (KeyError, IndexError, TypeError, ValueError) as error:
             raise ProviderFailure("invalid_output") from error
 

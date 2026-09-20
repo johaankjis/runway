@@ -134,6 +134,7 @@ def test_nemotron_live_http_contract(repository, source, facts, monkeypatch):
         assert str(request.url) == "https://integrate.api.nvidia.com/v1/chat/completions"
         assert kwargs["headers"]["Authorization"] == "Bearer test-key"
         assert kwargs["json"]["model"] == "nvidia/llama-3.3-nemotron-super-49b-v1"
+        assert "reasoning" not in kwargs["json"]
         assert "Do not calculate" in kwargs["json"]["messages"][0]["content"]
         return httpx.Response(
             200,
@@ -161,8 +162,145 @@ def test_nemotron_live_http_contract(repository, source, facts, monkeypatch):
     assert result.signal.extraction.provider.provider == "nemotron"
 
 
+def test_openrouter_nemotron_content_and_provenance(repository, facts, monkeypatch):
+    def handler(request, kwargs):
+        assert str(request.url) == "https://openrouter.ai/api/v1/chat/completions"
+        assert kwargs["json"]["model"] == "nvidia/nemotron-3.5-lightning:free"
+        assert kwargs["json"]["reasoning"] == {"enabled": False}
+        return httpx.Response(
+            200,
+            request=request,
+            json={
+                "provider": "Nvidia",
+                "model": "nvidia/nemotron-3.5-lightning:free",
+                "choices": [
+                    {
+                        "finish_reason": "stop",
+                        "message": {
+                            "content": facts.model_dump_json(),
+                            "reasoning": "Untrusted reasoning is not extraction evidence.",
+                        },
+                    }
+                ],
+            },
+        )
+
+    mock_post(monkeypatch, handler)
+    settings = ProviderSettings(
+        signal_provider="nemotron",
+        nvidia_api_key="test-key",
+        nvidia_base_url="https://openrouter.ai/api/v1",
+        nvidia_model="nvidia/nemotron-3.5-lightning:free",
+    )
+    with TestClient(create_app(repository, settings)) as client:
+        baseline = client.get("/api/financial-state").json()
+        for _ in range(2):
+            response = client.request("POST", "/api/documents/doc-supplier-price-notice/extract")
+            assert response.status_code == 200
+            body = response.json()
+            assert body["financial_state"] == baseline
+            assert body["application_status"] == "already_in_baseline"
+            signal = body["signal"]
+            assert signal["financial_effect"]["amount_cents"] == 214000
+            assert signal["extraction"]["attributes"] == facts.model_dump(mode="json")
+            assert signal["extraction"]["provider"] == {
+                "requested_provider": "nemotron",
+                "provider": "nemotron",
+                "mode": "live",
+                "model": settings.nvidia_model,
+                "failure_reason": None,
+            }
+            assert signal["evidence"][0]["excerpt"] == facts.excerpt
+            assert signal["evidence"][0]["locator"].startswith("lines 1-")
+        assert len(client.get("/api/signals").json()) == 5
+
+
 @pytest.mark.parametrize(
-    "failure", ["timeout", "network", "429", "500", "json", "schema", "evidence"]
+    "change",
+    [None, "words", "interior_spaces", "line_break", "missing_text", "source_id", "amount"],
+)
+def test_nemotron_captured_excerpt_whitespace(repository, source, monkeypatch, change):
+    # Real OpenRouter/Nemotron response with reasoning disabled: valid facts,
+    # but only one trailing space on the synthetic-document line instead of two.
+    payload = {
+        "type": "supplier_pricing_increase",
+        "source_document_id": "doc-supplier-price-notice",
+        "entity": "Metro Foods",
+        "percentage": 18,
+        "monthly_increase_usd": 2140,
+        "effective_date": "2026-09-15",
+        "confidence": 0.95,
+        "excerpt": source[1].replace(
+            "**Synthetic demo document**  \n", "**Synthetic demo document** \n"
+        ),
+    }
+    if change == "words":
+        payload["excerpt"] = payload["excerpt"].replace("Metro Foods", "Invented Foods")
+    elif change == "interior_spaces":
+        payload["excerpt"] = payload["excerpt"].replace("Metro Foods", "Metro  Foods")
+    elif change == "line_break":
+        payload["excerpt"] = payload["excerpt"].replace("will\napply", "will apply")
+    elif change == "missing_text":
+        payload["excerpt"] = payload["excerpt"].replace("**Synthetic demo document** \n", "")
+    elif change == "source_id":
+        payload["source_document_id"] = "wrong-document"
+    elif change == "amount":
+        payload["monthly_increase_usd"] = 4280
+
+    def handler(request, kwargs):
+        return httpx.Response(
+            200,
+            request=request,
+            json={
+                "choices": [{"finish_reason": "stop", "message": {"content": json.dumps(payload)}}]
+            },
+        )
+
+    mock_post(monkeypatch, handler)
+    settings = ProviderSettings(
+        signal_provider="nemotron",
+        nvidia_api_key="test-key",
+        nvidia_base_url="https://openrouter.ai/api/v1",
+        nvidia_model="nvidia/nemotron-3.5-lightning:free",
+    )
+    baseline = repository.get_financial_state()
+    with TestClient(create_app(repository, settings)) as client:
+        for _ in range(2):
+            response = client.request("POST", "/api/documents/doc-supplier-price-notice/extract")
+            assert response.status_code == 200
+            signal = response.json()["signal"]
+            provider = signal["extraction"]["provider"]
+            if change is None:
+                assert provider["mode"] == "live"
+                assert provider["provider"] == "nemotron"
+                assert provider["model"] == settings.nvidia_model
+                attributes = signal["extraction"]["attributes"]
+                assert attributes == {**payload, "excerpt": source[1]}
+                validate_evidence(SupplierFacts.model_validate(attributes), *source)
+                assert signal["evidence"][0]["excerpt"] == source[1]
+            else:
+                assert provider["mode"] == "fallback"
+                assert provider["failure_reason"] == "invalid_output"
+            assert signal["financial_effect"]["amount_cents"] == 214000
+            assert repository.get_financial_state() == baseline
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        "timeout",
+        "network",
+        "429",
+        "500",
+        "json",
+        "schema",
+        "evidence",
+        "thinking_truncated",
+        "json_truncated",
+        "reasoning_only",
+        "prose",
+        "fenced",
+    ],
 )
 def test_nemotron_failure_fallback(repository, source, facts, monkeypatch, failure):
     def handler(request, kwargs):
@@ -175,14 +313,24 @@ def test_nemotron_failure_fallback(repository, source, facts, monkeypatch, failu
         content = "bad json" if failure == "json" else "{}"
         if failure == "evidence":
             content = json.dumps({**facts.model_dump(mode="json"), "entity": "Invented"})
+        if failure == "thinking_truncated":
+            content = "Here's a thinking process:\n\n1. **Analyze User Input:**"
+        if failure == "json_truncated":
+            content = facts.model_dump_json()
+        if failure == "reasoning_only":
+            content = None
+        if failure == "prose":
+            content = "Here are the facts: " + facts.model_dump_json()
+        if failure == "fenced":
+            content = "```json\n" + facts.model_dump_json() + "\n```"
         return httpx.Response(
             200,
             request=request,
             json={
                 "choices": [
                     {
-                        "finish_reason": "stop",
-                        "message": {"content": content},
+                        "finish_reason": "length" if failure.endswith("truncated") else "stop",
+                        "message": {"content": content, "reasoning": facts.model_dump_json()},
                     }
                 ]
             },
@@ -202,6 +350,8 @@ def test_nemotron_failure_fallback(repository, source, facts, monkeypatch, failu
     assert metadata.provider == "fixture"
     assert metadata.requested_provider == "nemotron"
     assert metadata.failure_reason
+    if failure not in {"timeout", "network", "429", "500"}:
+        assert metadata.failure_reason == "invalid_output"
     assert "secret" not in result.model_dump_json()
 
 
