@@ -85,6 +85,11 @@ class NemotronSignalExtractor:
             if choice["finish_reason"] != "stop":
                 raise ValueError("Incomplete response")
             facts = SupplierFacts.model_validate_json(choice["message"]["content"])
+            # Some providers double-escape newlines inside the JSON string. Repair
+            # only an exact, whole-source encoding match; never decode arbitrary
+            # escapes or reconstruct evidence from model-selected fragments.
+            if facts.excerpt == content.replace("\n", r"\n"):
+                facts.excerpt = content
             # Models may lose Markdown's trailing spaces when copying the document.
             # Restore source bytes only for a full-document match differing solely
             # in horizontal whitespace at line ends. Never repair words or facts.

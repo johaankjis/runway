@@ -22,6 +22,7 @@ The object must contain these fields (use null for the unused amount basis):
 - confidence: a JSON number between 0 and 1, not a percentage or a string.
 - excerpt: copy the entire supplied document string exactly, including markdown, spaces,
   trailing spaces and newlines. Encode newlines as JSON escapes. Do not reformat the source.
+  After JSON decoding, excerpt must contain actual line breaks, not literal backslash-n text.
 Do not add an evidence object, quote/location fields, or any other fields; application code
 derives the evidence location from the exact excerpt.
 Do not calculate balances, inflows, outflows, runway, shortfalls, scenarios or recommendations.

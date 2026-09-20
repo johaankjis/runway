@@ -267,3 +267,113 @@ def test_upload_contract_schema(client):
         "application_status"
     ]["enum"]
     assert set(statuses) == {"already_in_baseline", "proposed", "potential_duplicate"}
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        None,
+        "already_decoded",
+        "monthly_invented",
+        "monthly_replaces_weekly",
+        "weekly_invented",
+        "percentage_invented",
+        "date_invented",
+        "entity_invented",
+        "source_id",
+        "words",
+        "interior_spaces",
+        "line_break",
+        "partial_excerpt",
+        "other_escape",
+        "malformed_json",
+        "incomplete_schema",
+        "missing_amount_basis",
+    ],
+)
+def test_captured_freshfields_pdf_response(repository, monkeypatch, change):
+    """Replay real OpenRouter output: JSON valid, excerpt newlines double-escaped."""
+    captured = json.loads(
+        (REPOSITORY_ROOT / "tests/fixtures/freshfields_nemotron_response.json").read_text()
+    )
+    calls = []
+
+    def post(self, url, **kwargs):
+        calls.append(kwargs)
+        assert kwargs["json"]["reasoning"] == {"enabled": False}
+        request = json.loads(kwargs["json"]["messages"][1]["content"])
+        payload = json.loads(captured["choices"][0]["message"]["content"])
+        payload["source_document_id"] = request["source_document_id"]
+        # Prove the captured output fails the original exact-evidence rule.
+        assert payload["excerpt"] not in request["document"]
+        assert payload["excerpt"] == request["document"].replace("\n", r"\n")
+        if change == "already_decoded":
+            payload["excerpt"] = request["document"]
+        elif change in {"monthly_invented", "monthly_replaces_weekly"}:
+            payload["monthly_increase_usd"] = 561.17
+            if change == "monthly_replaces_weekly":
+                payload["weekly_spend_usd"] = None
+        elif change == "weekly_invented":
+            payload["weekly_spend_usd"] = 2000
+        elif change == "percentage_invented":
+            payload["percentage"] = 8
+        elif change == "date_invented":
+            payload["effective_date"] = "2026-10-02"
+        elif change == "entity_invented":
+            payload["entity"] = "Another Supplier"
+        elif change == "source_id":
+            payload["source_document_id"] = "another-document"
+        elif change == "words":
+            payload["excerpt"] = payload["excerpt"].replace("Produce", "Foods")
+        elif change == "interior_spaces":
+            payload["excerpt"] = payload["excerpt"].replace("Current weekly", "Current  weekly")
+        elif change == "line_break":
+            payload["excerpt"] = payload["excerpt"].replace(r"on the\nstated", "on the stated")
+        elif change == "partial_excerpt":
+            payload["excerpt"] = payload["excerpt"].split(r"\n", 1)[1]
+        elif change == "other_escape":
+            payload["excerpt"] = payload["excerpt"].replace("$", r"\u0024")
+        elif change == "incomplete_schema":
+            del payload["percentage"]
+        elif change == "missing_amount_basis":
+            del payload["weekly_spend_usd"]
+        captured["choices"][0]["message"]["content"] = (
+            "{broken json" if change == "malformed_json" else json.dumps(payload)
+        )
+        return httpx.Response(200, request=httpx.Request("POST", url), json=captured)
+
+    monkeypatch.setattr(httpx.Client, "post", post)
+    settings = ProviderSettings(
+        signal_provider="nemotron",
+        nvidia_api_key="test-key",
+        nvidia_base_url="https://openrouter.ai/api/v1",
+        nvidia_model=captured["model"],
+    )
+    baseline = repository.get_financial_state()
+    with TestClient(create_app(repository, settings)) as client:
+        doc = upload(
+            client,
+            (DEMO / "freshfields-surcharge.pdf").read_bytes(),
+            "fresh.pdf",
+            "application/pdf",
+        ).json()
+        result = analyze(client, doc)
+        assert result.status_code == 200
+        body = result.json()
+        signal = body["signal"]
+        provenance = signal["extraction"]
+        valid = change in {None, "already_decoded"}
+        assert provenance["provider"]["mode"] == ("live" if valid else "fallback")
+        assert provenance["provider"]["failure_reason"] == (None if valid else "invalid_output")
+        assert provenance["attributes"]["weekly_spend_usd"] == 1850
+        assert provenance["attributes"]["monthly_increase_usd"] is None
+        assert provenance["attributes"]["percentage"] == 7
+        assert provenance["attributes"]["effective_date"] == "2026-10-01"
+        assert signal["evidence"][0]["excerpt"] == repository.get_uploaded_text(doc["id"])
+        assert signal["financial_effect"]["amount_cents"] == 56117
+        assert signal["disposition"] == "proposed"
+        assert body["application_status"] == "proposed"
+        assert repository.get_financial_state() == baseline
+        assert analyze(client, doc).json() == body
+        assert len(calls) == 1
+        assert repository.get_financial_state() == baseline
