@@ -2,10 +2,8 @@
  * Voice integration: maps owner questions onto the backend's briefing focus
  * enum (POST /api/voice/briefing) and decodes ElevenLabs audio for playback.
  *
- * The backend generates the briefing text deterministically from engine state
- * and optionally synthesizes it. There is no speech recognition, free-form
- * question interpretation, or conversational memory in this milestone, so the
- * UI offers a fixed set of prompts that each resolve to a supported focus.
+ * These fixed chips retain their deterministic briefing route. Spoken and typed
+ * questions use the dedicated one-turn question route.
  */
 import type { VoiceRequest } from "@runway/contracts";
 

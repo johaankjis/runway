@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, AudioLines, FlaskConical, Loader2, Pause, Play } from "lucide-react";
+import { Loader2, Mic, Square } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
@@ -8,30 +8,33 @@ import type { VoicePrompt } from "@/lib/voice";
 
 /**
  * idle       nothing generated yet
- * generating waiting on POST /api/voice/briefing
+ * listening  browser recognition is capturing one utterance
+ * generating waiting on a grounded answer or briefing
  * ready      briefing with live audio, not playing
  * playing    live audio is playing
  * fixture    briefing generated in fixture mode (text only, by design)
  * fallback   live provider requested but unavailable (text only)
  * error      the request failed
  */
-export type VoiceStatus = "idle" | "generating" | "ready" | "playing" | "fixture" | "fallback" | "error";
+export type VoiceStatus = "idle" | "listening" | "generating" | "ready" | "playing" | "fixture" | "fallback" | "error";
 
 const statusCopy: Record<VoiceStatus, string> = {
-  idle: "Ask Runway for a grounded briefing",
-  generating: "Checking your numbers…",
-  ready: "Briefing ready · tap to play",
-  playing: "Runway is speaking…",
+  idle: "Ask Runway",
+  listening: "Listening…",
+  generating: "Understanding your question…",
+  ready: "Answer ready · ask another question",
+  playing: "Runway is responding",
   fixture: "Briefing ready · text only (demo fixture)",
   fallback: "Briefing ready · voice provider unavailable",
   error: "Couldn't generate a briefing",
 };
 
 const statusHint: Record<VoiceStatus, string> = {
-  idle: "Pick a question below, or tap the button for a summary of your cash position.",
+  idle: "Tap to speak, type a question, or pick a question below.",
+  listening: "Speak one question. Tap again to stop, or cancel below.",
   generating: "Composing the briefing from the engine's calculated state.",
   ready: "Spoken by ElevenLabs. Use the player below to replay or scrub.",
-  playing: "Tap the button to pause.",
+  playing: "Use the audio player below to pause or replay.",
   fixture: "Configure ElevenLabs on the API to hear briefings spoken.",
   fallback: "The briefing text is complete; audio could not be produced.",
   error: "Check the message below and try again.",
@@ -61,11 +64,6 @@ function Waveform({ active, mirrored = false }: { active: boolean; mirrored?: bo
   );
 }
 
-/**
- * Voice-first shell. The primary control generates a briefing (or plays/pauses
- * live audio once one exists); prompt chips pick which supported focus to ask.
- * There is no microphone or speech recognition: the button never listens.
- */
 export function VoiceAssistantPanel({
   status,
   onPrimary,
@@ -88,19 +86,8 @@ export function VoiceAssistantPanel({
   footer?: ReactNode;
 }) {
   const busy = status === "generating";
-  const active = status === "playing" || busy;
-  const Icon =
-    status === "generating"
-      ? Loader2
-      : status === "playing"
-        ? Pause
-        : status === "ready"
-          ? Play
-          : status === "fallback"
-            ? AlertTriangle
-            : status === "fixture"
-              ? FlaskConical
-              : AudioLines;
+  const active = status === "playing" || status === "listening";
+  const Icon = busy ? Loader2 : status === "listening" ? Square : Mic;
 
   return (
     <section

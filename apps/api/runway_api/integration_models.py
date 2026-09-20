@@ -2,6 +2,8 @@
 
 from typing import Literal
 
+from pydantic import Field, field_validator
+
 from runway_api.models import (
     FinancialState,
     ProviderMetadata,
@@ -38,3 +40,21 @@ class VoiceResponse(StrictModel):
     provider: ProviderMetadata
     audio_base64: str | None = None
     audio_mime_type: Literal["audio/mpeg"] | None = None
+
+
+class VoiceQuestionRequest(StrictModel):
+    question: str = Field(min_length=1, max_length=500)
+    language: VoiceLanguage = "en"
+
+    @field_validator("question")
+    @classmethod
+    def nonblank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Question must not be blank")
+        return value.strip()
+
+
+class VoiceQuestionResponse(VoiceResponse):
+    question: str
+    answer_provider: ProviderMetadata
+    grounding: Literal["verified", "deterministic_fallback"]
