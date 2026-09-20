@@ -52,6 +52,22 @@ class CashFlowEntry(StrictModel):
     source_document_id: str | None = None
 
 
+class ForecastAdjustment(StrictModel):
+    id: str
+    source_signal_id: str
+    source_document_id: str
+    source_filename: str
+    entity: str
+    type: Literal["supplier_pricing_increase"]
+    monthly_amount_cents: NonNegativeMoney
+    amount_cents: Annotated[int, Field(gt=0)]
+    cadence: Literal["monthly"] = "monthly"
+    effective_date: date
+    application_status: Literal["incorporated"] = "incorporated"
+    calculation_explanation: str
+    applied_at: datetime
+
+
 class FinancialState(StrictModel):
     business_id: str
     as_of: date
@@ -65,6 +81,7 @@ class FinancialState(StrictModel):
     average_daily_net_burn_cents: NonNegativeMoney
     cash_runway_days: int | None
     cash_flow: list[CashFlowEntry]
+    forecast_adjustments: list[ForecastAdjustment] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_calculated_values(self) -> FinancialState:
@@ -142,11 +159,22 @@ class SupplierFacts(StrictModel):
     entity: Annotated[str, Field(min_length=1, max_length=200)]
     percentage: Annotated[float, Field(strict=True, gt=0, le=300, allow_inf_nan=False)]
     monthly_increase_usd: Annotated[
-        float, Field(strict=True, gt=0, le=1_000_000, allow_inf_nan=False)
-    ]
+        float | None, Field(strict=True, gt=0, le=1_000_000, allow_inf_nan=False)
+    ] = None
+    weekly_spend_usd: Annotated[
+        float | None, Field(strict=True, gt=0, le=1_000_000, allow_inf_nan=False)
+    ] = None
     effective_date: date | None
     confidence: Annotated[float, Field(strict=True, ge=0, le=1, allow_inf_nan=False)]
     excerpt: Annotated[str, Field(min_length=20, max_length=10000)]
+
+    @model_validator(mode="after")
+    def validate_amount_basis(self) -> SupplierFacts:
+        if (self.monthly_increase_usd is None) == (self.weekly_spend_usd is None):
+            raise ValueError(
+                "Supply exactly one explicit amount basis: monthly increase or weekly spend"
+            )
+        return self
 
 
 class ProviderMetadata(StrictModel):
@@ -187,6 +215,8 @@ class Signal(StrictModel):
     evidence: Annotated[list[SignalEvidence], Field(min_length=1)]
     source_document_id: str
     extraction: ExtractionProvenance | None = None
+    disposition: Literal["baseline", "proposed", "duplicate", "incorporated"] = "baseline"
+    duplicate_of_signal_id: str | None = None
 
     @model_validator(mode="after")
     def validate_provenance(self) -> Signal:
@@ -203,7 +233,7 @@ class Document(StrictModel):
     mime_type: str
     document_date: date
     ingested_at: datetime
-    source: Literal["fixture"] = "fixture"
+    source: Literal["fixture", "upload"] = "fixture"
     summary: str
     checksum_sha256: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
     related_signal_ids: list[str]

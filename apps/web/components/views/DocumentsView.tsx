@@ -1,10 +1,10 @@
 "use client";
 
-import type { Document, ExtractionResponse, Signal } from "@runway/contracts";
+import type { Document, Signal } from "@runway/contracts";
 import { Sparkles, Upload, UploadCloud } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type DragEvent } from "react";
 
-import { DocumentAnalysisPanel, type AnalysisRun } from "@/components/domain/DocumentAnalysisPanel";
+import { DocumentAnalysisPanel } from "@/components/domain/DocumentAnalysisPanel";
 import { DocumentRow, type DocumentAnalysisStatus } from "@/components/domain/DocumentRow";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -14,12 +14,28 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
 import { invalidateApiCache, primeApiCache, useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { createDocumentWorkflow, type AnalysisRun } from "@/lib/document-workflow";
 import { matchesDocumentFilter, type DocumentFilter } from "@/lib/presentation";
 
 /** The backend's extraction grammar currently covers supplier pricing notices. */
-const EXTRACTABLE_TYPES = new Set(["supplier_notice"]);
+const EXTRACTABLE_TYPES = new Set(["supplier_notice", "uploaded_document"]);
 
-function statusFor(document: Document, related: Signal[]): DocumentAnalysisStatus {
+const workflow = createDocumentWorkflow(api, (response) => {
+  primeApiCache(`signal:${response.signal.id}`, response.signal);
+  primeApiCache("financial-state", response.financial_state);
+  invalidateApiCache("signals");
+  invalidateApiCache("documents");
+  invalidateApiCache("recommendations");
+});
+const emptyRuns: Record<string, AnalysisRun> = {};
+const serverSnapshot = () => emptyRuns;
+
+function statusFor(document: Document, related: Signal[], run?: AnalysisRun): DocumentAnalysisStatus {
+  if (run?.status === "analyzing") return { kind: "analyzing" };
+  if (run?.status === "error") return { kind: "error" };
+  if (run?.status === "success" && run.response.signal.extraction) {
+    return { kind: "analyzed", provider: run.response.signal.extraction.provider };
+  }
   const extracted = related.find((signal) => signal.extraction);
   if (extracted?.extraction) return { kind: "analyzed", provider: extracted.extraction.provider };
   if (EXTRACTABLE_TYPES.has(document.document_type)) return { kind: "ready" };
@@ -27,18 +43,23 @@ function statusFor(document: Document, related: Signal[]): DocumentAnalysisStatu
 }
 
 export function DocumentsView() {
-  const documents = useApi("documents", api.getDocuments);
+  const documents = useApi("documents", api.getDocuments, { revalidate: true });
   const signals = useApi("signals", api.getSignals, { revalidate: true });
   const [filter, setFilter] = useState<DocumentFilter>("all");
   const [dragging, setDragging] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const uploadLock = useRef(false);
+  const [uploaded, setUploaded] = useState<Document[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [runs, setRuns] = useState<Record<string, AnalysisRun>>({});
+  const runs = useSyncExternalStore(workflow.subscribe, workflow.getSnapshot, serverSnapshot);
   const refetchSignals = signals.refetch;
+  const refetchDocuments = documents.refetch;
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const all = documents.data ?? [];
+  const all = [...uploaded.filter((doc) => !documents.data?.some((item) => item.id === doc.id)), ...(documents.data ?? [])];
   const visible = all.filter((doc) => matchesDocumentFilter(doc.document_type, filter));
   const count = (key: DocumentFilter) => all.filter((doc) => matchesDocumentFilter(doc.document_type, key)).length;
   const totalSignals = all.reduce((sum, doc) => sum + doc.related_signal_ids.length, 0);
@@ -54,40 +75,65 @@ export function DocumentsView() {
   const activeId = selectedId && all.some((doc) => doc.id === selectedId) ? selectedId : defaultId;
   const selected = all.find((doc) => doc.id === activeId) ?? null;
 
-  const analyze = useCallback(
-    async (documentId: string) => {
-      setRuns((prev) => ({ ...prev, [documentId]: { status: "analyzing" } }));
-      try {
-        const response: ExtractionResponse = await api.extractDocument(documentId);
-        // Persisted provenance must flow through the existing signal APIs, so
-        // seed the caches with what the backend returned and refetch the list.
-        primeApiCache(`signal:${response.signal.id}`, response.signal);
-        primeApiCache("financial-state", response.financial_state);
-        invalidateApiCache("signals");
-        invalidateApiCache("recommendations");
-        setRuns((prev) => ({ ...prev, [documentId]: { status: "success", response } }));
-        refetchSignals();
-      } catch (error) {
-        setRuns((prev) => ({
-          ...prev,
-          [documentId]: { status: "error", error: error instanceof Error ? error : new Error(String(error)) },
-        }));
-      }
-    },
-    [refetchSignals],
-  );
+  useEffect(() => {
+    // Refetch read-only lists when a request finishes, including after navigation.
+    refetchSignals();
+    refetchDocuments();
+  }, [runs, refetchSignals, refetchDocuments]);
 
   useEffect(() => {
     if (selectedId) panelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [selectedId]);
 
   const handleFiles = (files: FileList | null) => {
-    const names = Array.from(files ?? []).map((file) => file.name);
-    setNotice(
-      names.length
-        ? `Received ${names.join(", ")}. Upload ingestion is not part of this milestone, so nothing was stored. Select the Metro Foods notice below to run extraction on a real document.`
-        : "Upload ingestion is not part of this milestone. Documents shown below come from the deterministic fixture.",
-    );
+    if (uploadLock.current) return;
+    setFile(null);
+    if (!files?.length) return;
+    if (files.length !== 1) {
+      setNotice("Choose one file at a time.");
+      return;
+    }
+    const next = files[0];
+    if (!/\.(pdf|txt)$/i.test(next.name)) {
+      setNotice("Only PDF or TXT files are supported.");
+      return;
+    }
+    if (next.size === 0 || next.size > 10 * 1024 * 1024) {
+      setNotice(next.size === 0 ? "The file is empty." : "File exceeds the 10 MB limit.");
+      return;
+    }
+    setFile(next);
+    setNotice(`Selected local file: ${next.name}. Ready to upload.`);
+  };
+
+  const upload = async () => {
+    if (!file || uploadLock.current) return;
+    uploadLock.current = true;
+    setUploading(true);
+    setNotice(`Uploading ${file.name} → processing document text…`);
+    try {
+      const { document, run } = await workflow.upload(file, (document) => {
+        setUploaded((previous) => [document, ...previous]);
+        invalidateApiCache("documents");
+        documents.refetch();
+        setSelectedId(document.id);
+        setFilter("all");
+        setFile(null);
+        setNotice(`${document.filename} saved. Analyzing and validating source evidence with the configured provider (Nemotron in live mode)… Eligible effects will update the forecast automatically.`);
+      });
+      setNotice(run.status === "error"
+        ? `${document.filename} was saved, but analysis could not complete. Review the details below and retry analysis; you do not need to upload again.`
+        : run.status === "success" && run.response.application_status === "incorporated"
+          ? `${document.filename} analyzed. Validated supplier costs are incorporated into the forecast. Current cash is unchanged.`
+          : run.status === "success" && run.response.application_status === "potential_duplicate"
+            ? `${document.filename} analyzed. Matching information already exists; no additional forecast adjustment was applied.`
+            : `${document.filename} analyzed. Review the result below; no new forecast adjustment was applied.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Upload failed. Try again.");
+    } finally {
+      uploadLock.current = false;
+      setUploading(false);
+    }
   };
 
   const onDrop = (event: DragEvent<HTMLDivElement>) => {
@@ -100,9 +146,9 @@ export function DocumentsView() {
     <div className="animate-fade-in">
       <PageHeader
         title="Documents"
-        subtitle="Select a document and let Runway extract a structured signal with traceable evidence."
+        subtitle="Upload a document. Runway automatically analyzes its evidence and updates eligible forecasts."
         actions={
-          <Button variant="secondary" onClick={() => inputRef.current?.click()} icon={<Upload className="h-4 w-4" aria-hidden />}>
+          <Button variant="secondary" disabled={uploading} onClick={() => inputRef.current?.click()} icon={<Upload className="h-4 w-4" aria-hidden />}>
             Upload document
           </Button>
         }
@@ -113,7 +159,8 @@ export function DocumentsView() {
         type="file"
         className="sr-only"
         aria-label="Upload document"
-        multiple
+        accept=".pdf,.txt,application/pdf,text/plain"
+        disabled={uploading}
         onChange={(event) => {
           handleFiles(event.target.files);
           event.target.value = "";
@@ -146,9 +193,9 @@ export function DocumentsView() {
           <UploadCloud className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[13.5px] font-semibold text-ink">Drop invoices, contracts, statements, or notices here</p>
+          <p className="text-[13.5px] font-semibold text-ink">Upload a business document</p>
           <p className="text-[12px] text-muted">
-            Runway turns documents into structured financial signals with traceable evidence.
+            Drop a file here or choose a file. PDF or TXT, up to 10 MB. One file at a time.
           </p>
         </div>
         <span className="hidden items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-ink-soft sm:inline-flex">
@@ -157,6 +204,14 @@ export function DocumentsView() {
         </span>
       </div>
 
+      {file ? (
+        <div className="mb-4 flex items-center gap-3">
+          <span className="text-sm text-ink-soft">{file.name}</span>
+          <Button disabled={uploading} onClick={() => void upload()}>
+            {uploading ? "Uploading · processing…" : "Upload selected file"}
+          </Button>
+        </div>
+      ) : null}
       {notice ? (
         <div role="status" className="mb-4 rounded-xl border border-info-100 bg-info-50 px-4 py-3 text-[12.5px] text-ink-soft">
           {notice}
@@ -209,7 +264,7 @@ export function DocumentsView() {
                   <DocumentRow
                     key={doc.id}
                     document={doc}
-                    status={statusFor(doc, signalsByDocument.get(doc.id) ?? [])}
+                    status={statusFor(doc, signalsByDocument.get(doc.id) ?? [], runs[doc.id])}
                     selected={doc.id === activeId}
                     onSelect={() => setSelectedId(doc.id)}
                   />
@@ -224,10 +279,10 @@ export function DocumentsView() {
         <div ref={panelRef} className="mt-5">
           <DocumentAnalysisPanel
             document={selected}
-            status={statusFor(selected, signalsByDocument.get(selected.id) ?? [])}
+            status={statusFor(selected, signalsByDocument.get(selected.id) ?? [], runs[selected.id])}
             relatedSignals={signalsByDocument.get(selected.id) ?? []}
             run={runs[selected.id] ?? { status: "idle" }}
-            onAnalyze={() => void analyze(selected.id)}
+            onAnalyze={() => { setNotice(null); void workflow.analyze(selected.id); }}
           />
         </div>
       ) : null}

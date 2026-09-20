@@ -70,3 +70,6 @@ The AI/provider milestone adds validated NVIDIA Nemotron supplier extraction and
 ElevenLabs briefings, both with credential-free fixture modes. See the
 [integration guide](docs/ai_integration_plan.md) for setup, fallback behavior, API contracts,
 and the exact demo path. Authentication, databases, queues, and deployment remain out of scope.
+
+See [live document upload](docs/live_document_upload.md) for PDF/TXT ingestion, the fictional
+FreshFields demo assets, provider reuse, duplicate behavior, and local test commands.

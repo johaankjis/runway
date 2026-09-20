@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from calendar import monthrange
+from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import NAMESPACE_URL, uuid5
 
 from runway_api.models import (
     CashFlowDirection,
+    CashFlowEntry,
     FinancialState,
     FinancialStateInput,
+    ForecastAdjustment,
     ScenarioRequest,
     ScenarioResult,
     ScenarioSnapshot,
+    SupplierFacts,
 )
 
 
@@ -129,3 +133,65 @@ def _snapshot(state: FinancialState) -> ScenarioSnapshot:
         average_daily_net_burn_cents=state.average_daily_net_burn_cents,
         cash_runway_days=state.cash_runway_days,
     )
+
+
+def supplier_monthly_impact_cents(facts: SupplierFacts) -> int:
+    """Calculate monthly supplier cost from source inputs, rounding half-up to cents."""
+    if facts.weekly_spend_usd is not None:
+        dollars = (
+            Decimal(str(facts.weekly_spend_usd))
+            * Decimal(str(facts.percentage))
+            / Decimal(100)
+            * Decimal(52)
+            / Decimal(12)
+        )
+    else:
+        dollars = Decimal(str(facts.monthly_increase_usd))
+    return int((dollars * 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+
+
+def prorated_supplier_cost(monthly_cents: int, start: date, end: date) -> tuple[int, str]:
+    """Inclusive calendar days; sum unrounded monthly fractions, then round once."""
+    total = Decimal(0)
+    parts = []
+    while start <= end:
+        days_in_month = monthrange(start.year, start.month)[1]
+        last = min(end, start.replace(day=days_in_month))
+        days = (last - start).days + 1
+        total += Decimal(monthly_cents) * days / days_in_month
+        parts.append(f"{days}/{days_in_month} for {start:%Y-%m}")
+        start = last + timedelta(days=1)
+    return int(total.quantize(Decimal(1), ROUND_HALF_UP)), " + ".join(parts)
+
+
+def recompute_forecast(
+    baseline: FinancialState, adjustments: list[ForecastAdjustment]
+) -> FinancialState:
+    entries = list(baseline.cash_flow) + [
+        CashFlowEntry(
+            id=item.id,
+            direction="outflow",
+            amount_cents=item.amount_cents,
+            description=f"Forecast adjustment: {item.entity}",
+            expected_date=baseline.forecast_end_date,
+            status="expected",
+            source_document_id=item.source_document_id,
+        )
+        for item in adjustments
+    ]
+    extra = sum(item.amount_cents for item in adjustments)
+    net = baseline.expected_outflows_cents - baseline.expected_inflows_cents
+    burn = _scaled_daily_burn(baseline.average_daily_net_burn_cents, net, net + extra)
+    state = calculate_financial_state(
+        baseline.business_id,
+        FinancialStateInput(
+            as_of=baseline.as_of,
+            forecast_end_date=baseline.forecast_end_date,
+            current_cash_cents=baseline.current_cash_cents,
+            minimum_cash_reserve_cents=baseline.minimum_cash_reserve_cents,
+            average_daily_net_burn_cents=burn,
+            cash_flow=entries,
+        ),
+    )
+    state.forecast_adjustments = [item.model_copy(deep=True) for item in adjustments]
+    return state

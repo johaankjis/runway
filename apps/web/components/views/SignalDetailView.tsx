@@ -145,7 +145,7 @@ export function SignalDetailView({ id }: { id: string }) {
               <Field label="Extraction">
                 <ProviderNote meta={extraction.provider} kind="extraction" />
                 <p className="mt-1.5 text-[12px] text-muted">
-                  {extraction.attributes.entity} · +{extraction.attributes.percentage}% · {formatUsd(extraction.attributes.monthly_increase_usd)} per month
+                  {extraction.attributes.entity} · +{extraction.attributes.percentage}% · {extraction.attributes.weekly_spend_usd != null ? `${formatUsd(extraction.attributes.weekly_spend_usd)} weekly spend` : `${formatUsd(extraction.attributes.monthly_increase_usd ?? 0)} per month`}
                   {extraction.attributes.effective_date ? ` · effective ${formatDate(extraction.attributes.effective_date)}` : ""} · extracted{" "}
                   {formatDateTime(extraction.extracted_at)}
                 </p>
@@ -220,6 +220,7 @@ export function SignalDetailView({ id }: { id: string }) {
                       ["Facts · entity", extraction.attributes.entity],
                       ["Facts · percentage", extraction.attributes.percentage],
                       ["Facts · monthly increase (USD)", extraction.attributes.monthly_increase_usd],
+                      ["Facts · weekly spend (USD)", extraction.attributes.weekly_spend_usd ?? null],
                       ["Facts · effective date", extraction.attributes.effective_date ?? "null"],
                       ["Facts · confidence", formatConfidence(extraction.attributes.confidence)],
                     ]

@@ -1,6 +1,6 @@
 "use client";
 
-import type { Document, ExtractionResponse, FinancialState, Signal } from "@runway/contracts";
+import type { Document, FinancialState, Signal } from "@runway/contracts";
 import {
   ArrowRight,
   Building2,
@@ -24,6 +24,7 @@ import { Card } from "@/components/ui/Card";
 import { ErrorState } from "@/components/ui/States";
 import { ApiError, NetworkError } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import type { AnalysisRun } from "@/lib/document-workflow";
 import {
   formatCents,
   formatConfidence,
@@ -32,13 +33,7 @@ import {
   formatPercent,
   formatUsd,
 } from "@/lib/format";
-import { cleanExcerpt, effectHeadline, labelForDocumentType } from "@/lib/presentation";
-
-export type AnalysisRun =
-  | { status: "idle" }
-  | { status: "analyzing" }
-  | { status: "success"; response: ExtractionResponse }
-  | { status: "error"; error: Error };
+import { effectHeadline, labelForDocumentType } from "@/lib/presentation";
 
 function Fact({ icon, label, value }: { icon: ReactNode; label: string; value: ReactNode }) {
   return (
@@ -67,7 +62,7 @@ function describeError(error: Error): { title: string; message: string; tone: "d
     return {
       title: "This document type can't be analyzed yet",
       message:
-        "Extraction currently supports supplier pricing notices with verifiable evidence. This document's signals come from the deterministic fixture.",
+        "Your document and its source text are saved. No supported, source-verified supplier effect could be extracted, so this attempt did not change the forecast. Qualitative information is retained in the document for review. You can retry analysis without uploading again.",
       tone: "info",
     };
   }
@@ -113,8 +108,8 @@ function ExtractedSignalSummary({ signal, financialState }: { signal: Signal; fi
           />
           <Fact
             icon={<TrendingUp className="h-3.5 w-3.5" />}
-            label="Stated monthly impact"
-            value={`${formatUsd(facts.monthly_increase_usd)} per month`}
+            label={facts.weekly_spend_usd != null ? "Stated weekly spend" : "Stated monthly impact"}
+            value={facts.weekly_spend_usd != null ? `${formatUsd(facts.weekly_spend_usd)} per week` : `${formatUsd(facts.monthly_increase_usd ?? 0)} per month`}
           />
           <Fact
             icon={<CalendarDays className="h-3.5 w-3.5" />}
@@ -141,8 +136,8 @@ function ExtractedSignalSummary({ signal, financialState }: { signal: Signal; fi
             <li key={item.id} className="rounded-lg border border-line bg-white p-3">
               <p className="flex items-start gap-2 text-[13px] leading-relaxed text-ink">
                 <Quote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-info-500" aria-hidden />
-                <span className="whitespace-pre-line">
-                  “<mark className="rounded bg-warning-100 px-0.5 text-ink">{cleanExcerpt(item.excerpt)}</mark>”
+                <span className="whitespace-pre-wrap">
+                  “<mark className="rounded bg-warning-100 px-0.5 text-ink">{item.excerpt}</mark>”
                 </span>
               </p>
               <p className="mt-1.5 pl-5 text-[11.5px] text-muted">
@@ -158,12 +153,11 @@ function ExtractedSignalSummary({ signal, financialState }: { signal: Signal; fi
         <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           {headline ? <span className="tabular text-[22px] font-bold tracking-tight text-ink">{headline}</span> : null}
           <Pill tone="danger" dot>
-            Already in baseline
+            {signal.disposition === "incorporated" ? "Incorporated into forecast" : signal.disposition === "duplicate" ? "Potential duplicate" : signal.disposition === "proposed" ? "Proposed · not applied" : "Already in baseline"}
           </Pill>
         </div>
         <p className="mt-2 text-[12.5px] leading-relaxed text-ink-soft">
-          The deterministic engine already includes this increase in the forecast. Extraction attaches provenance to
-          the existing signal; it does not apply the cost a second time.
+          {effect.description}
         </p>
         {financialState ? (
           <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -205,7 +199,6 @@ export function DocumentAnalysisPanel({
     run.status === "success" ? run.response.signal : (relatedSignals.find((signal) => signal.extraction) ?? null);
   const financialState = run.status === "success" ? run.response.financial_state : null;
   const analyzed = status.kind === "analyzed" || run.status === "success";
-  const canAnalyze = status.kind === "ready" || status.kind === "analyzed";
 
   return (
     <Card className={cn("space-y-5", className)} aria-live="polite">
@@ -222,7 +215,7 @@ export function DocumentAnalysisPanel({
             <p className="mt-0.5 text-[12px] text-muted">
               {labelForDocumentType(document.document_type)} · {document.filename} · dated {formatDate(document.document_date)}
             </p>
-            <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-ink-soft">{document.summary}</p>
+            <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-ink-soft">{document.source === "upload" ? "Source document saved. Analysis verifies evidence before any forecast adjustment." : document.summary}</p>
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -244,7 +237,7 @@ export function DocumentAnalysisPanel({
               )
             }
           >
-            {analyzing ? "Analyzing…" : analyzed ? "Re-analyze document" : canAnalyze ? "Analyze document" : "Analyze document"}
+            {analyzing ? "Analyzing and validating…" : run.status === "error" ? "Retry analysis" : analyzed ? "Re-analyze document" : "Analyze document"}
           </Button>
         </div>
       </div>
@@ -253,11 +246,11 @@ export function DocumentAnalysisPanel({
         <div role="status" className="rounded-xl border border-info-100 bg-info-50/60 p-4">
           <p className="flex items-center gap-2 text-[13.5px] font-semibold text-ink">
             <Loader2 className="h-4 w-4 animate-spin text-info-600" aria-hidden />
-            Analyzing {document.filename}
+            Analyzing and validating {document.filename}
           </p>
           <p className="mt-1 text-[12.5px] text-ink-soft">
-            Reading the source, extracting a structured signal, and verifying every fact against the document text before
-            anything is stored.
+            Requesting the configured extraction provider (Nemotron in live mode), extracting a structured signal, and verifying every fact against the document text before
+            any eligible cost is incorporated into the forecast.
           </p>
           <div className="mt-3 space-y-2" aria-hidden>
             <span className="block h-3.5 w-2/5 animate-pulse rounded bg-info-100" />
@@ -293,7 +286,7 @@ export function DocumentAnalysisPanel({
               <p className="mt-1 text-[12.5px] leading-relaxed text-ink-soft">
                 Analyze this notice to extract a structured supplier signal with the entity, percentage, effective date,
                 supporting excerpt, confidence, and the provider that produced it. Facts are verified against the source
-                before anything is stored.
+                before any eligible cost is incorporated into the forecast.
               </p>
             </>
           ) : (

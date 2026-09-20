@@ -14,7 +14,6 @@ import { formatConfidence, formatDate, formatDateTime, formatPercent, formatUsd 
 import {
   calculationStatusLabel,
   calculationStatusTone,
-  cleanExcerpt,
   effectHeadline,
   effectKindLabel,
   effectTone,
@@ -121,7 +120,7 @@ export function ProvenanceFlow({ signal, document }: { signal: Signal; document?
             {[
               { label: "Entity", value: facts.entity },
               { label: "Change", value: `+${formatPercent(facts.percentage, Number.isInteger(facts.percentage) ? 0 : 1)} price increase` },
-              { label: "Stated monthly impact", value: `${formatUsd(facts.monthly_increase_usd)} / month` },
+              { label: facts.weekly_spend_usd != null ? "Stated weekly spend" : "Stated monthly impact", value: facts.weekly_spend_usd != null ? `${formatUsd(facts.weekly_spend_usd)} / week` : `${formatUsd(facts.monthly_increase_usd ?? 0)} / month` },
               { label: "Effective", value: facts.effective_date ? formatDate(facts.effective_date) : "Not stated" },
             ].map((item) => (
               <div key={item.label} className="rounded-lg border border-info-100 bg-white px-3 py-2">
@@ -136,8 +135,8 @@ export function ProvenanceFlow({ signal, document }: { signal: Signal; document?
             <li key={item.id} className="rounded-lg border border-info-100 bg-white p-3">
               <p className="flex items-start gap-2 text-[13px] text-ink">
                 <Quote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-info-500" aria-hidden />
-                <span className="whitespace-pre-line">
-                  “<mark className="rounded bg-warning-100 px-0.5 text-ink">{cleanExcerpt(item.excerpt)}</mark>”
+                <span className="whitespace-pre-wrap">
+                  “<mark className="rounded bg-warning-100 px-0.5 text-ink">{item.excerpt}</mark>”
                 </span>
               </p>
               <p className="mt-1.5 pl-5 text-[11.5px] text-muted">
@@ -194,7 +193,7 @@ export function ProvenanceFlow({ signal, document }: { signal: Signal; document?
 /** Renders the source document with the evidence excerpt highlighted in place. */
 export function SourceDocumentViewer({ signal, document }: { signal: Signal; document?: Document }) {
   const [loaded, setLoaded] = useState<{ filename: string; content: string | null } | null>(null);
-  const filename = document?.filename ?? null;
+  const filename = document?.source === "upload" ? null : document?.filename ?? null;
 
   useEffect(() => {
     if (!filename) return;
@@ -273,7 +272,7 @@ export function SourceDocumentViewer({ signal, document }: { signal: Signal; doc
           <FileText className="h-4 w-4 shrink-0 text-muted" aria-hidden />
           <span className="truncate font-medium">{document?.filename ?? signal.source_document_id}</span>
         </div>
-        <Pill tone="neutral">Page 1 of 1</Pill>
+        <Pill tone="neutral">{document?.source === "upload" ? "Extracted text evidence" : "Page 1 of 1"}</Pill>
       </div>
       <div className="scrollbar-thin max-h-[440px] space-y-1 overflow-y-auto bg-[#FCFCFB] p-5">
         {content === undefined ? (
@@ -286,11 +285,11 @@ export function SourceDocumentViewer({ signal, document }: { signal: Signal; doc
           </div>
         ) : content === null ? (
           <div>
-            <p className="text-[12.5px] text-muted">Full document text is unavailable in this environment.</p>
+            <p className="text-[12.5px] text-muted">{document?.source === "upload" ? "Exact evidence from the parsed upload. PDF text order may differ from the page layout." : "Full document text is unavailable in this environment."}</p>
             <ul className="mt-3 space-y-2">
               {signal.evidence.map((item) => (
-                <li key={item.id} className="whitespace-pre-line text-[13px] text-ink">
-                  “<mark className="rounded bg-warning-100 px-0.5">{cleanExcerpt(item.excerpt)}</mark>”
+                <li key={item.id} className="whitespace-pre-wrap text-[13px] text-ink">
+                  “<mark className="rounded bg-warning-100 px-0.5">{item.excerpt}</mark>”
                   <span className="block text-[11.5px] text-muted">{item.locator}</span>
                 </li>
               ))}

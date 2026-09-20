@@ -1,0 +1,17 @@
+{
+  "model": "nvidia/nemotron-3.5-lightning:free",
+  "choices": [
+    {
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop",
+      "native_finish_reason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"type\": \"supplier_pricing_increase\",\n  \"source_document_id\": \"upload-freshfields-captured\",\n  \"entity\": \"FreshFields Produce\",\n  \"percentage\": 7,\n  \"monthly_increase_usd\": null,\n  \"weekly_spend_usd\": 1850,\n  \"effective_date\": \"2026-10-01\",\n  \"confidence\": 0.95,\n  \"excerpt\": \"FreshFields Produce\\\\nDelivery surcharge notice\\\\nFICTIONAL SYNTHETIC DEMO DOCUMENT - NOT A REAL VENDOR NOTICE\\\\nFreshFields Produce - Delivery Surcharge Notice\\\\nSupplier: FreshFields Produce\\\\nCustomer: Maya's Catering (fictional demo business)\\\\nNotice date: September 20, 2026\\\\nEffective date: October 1, 2026\\\\nCurrent weekly spend: $1,850\\\\nNew delivery surcharge: 7%\\\\nThe delivery surcharge applies to the current weekly spend starting on the\\\\nstated effective date. Weekly purchasing volume is assumed unchanged.\\\\nThis notice states source inputs only; it does not estimate a monthly impact.\\\\nAll names and amounts are fictional and supplied for the Runway demo.\\\\nRunway demo | Fictional source inputs | No real vendor or transaction\\\\n\"\n}",
+        "refusal": null,
+        "reasoning": null
+      }
+    }
+  ]
+}

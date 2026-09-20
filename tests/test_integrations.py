@@ -275,7 +275,7 @@ def test_nemotron_captured_excerpt_whitespace(repository, source, monkeypatch, c
                 assert provider["provider"] == "nemotron"
                 assert provider["model"] == settings.nvidia_model
                 attributes = signal["extraction"]["attributes"]
-                assert attributes == {**payload, "excerpt": source[1]}
+                assert attributes == {**payload, "excerpt": source[1], "weekly_spend_usd": None}
                 validate_evidence(SupplierFacts.model_validate(attributes), *source)
                 assert signal["evidence"][0]["excerpt"] == source[1]
             else:
