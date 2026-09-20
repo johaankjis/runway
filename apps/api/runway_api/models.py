@@ -155,7 +155,13 @@ class ProviderMetadata(StrictModel):
     mode: Literal["fixture", "live", "fallback"]
     model: str | None = None
     failure_reason: (
-        Literal["missing_credentials", "provider_unavailable", "invalid_output"] | None
+        Literal[
+            "missing_credentials",
+            "provider_unavailable",
+            "invalid_output",
+            "grounding_validation_failed",
+        ]
+        | None
     ) = None
 
 

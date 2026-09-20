@@ -18,6 +18,7 @@ const providerName: Record<ProviderMetadata["provider"], string> = {
 const failureCopy: Record<NonNullable<ProviderMetadata["failure_reason"]>, string> = {
   missing_credentials: "credentials not configured",
   provider_unavailable: "provider unreachable",
+  grounding_validation_failed: "briefing grounding validation failed; safe English text is shown",
   invalid_output: "provider returned invalid output",
 };
 

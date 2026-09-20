@@ -13,6 +13,7 @@ from runway_api.integration_models import VoiceRequest, VoiceResponse
 from runway_api.models import ProviderMetadata
 from runway_api.provider_config import ProviderSettings
 from runway_api.repository import InMemoryRepository
+from runway_api.voice_localization import TEMPLATES, numeric_facts, render_segment
 
 
 class VoiceProvider(Protocol):
@@ -64,41 +65,57 @@ def create_briefing(
         raise ValueError("Provide scenario parameters exactly when focus is scenario")
     state = repo.get_financial_state()
     signals = repo.list_signals()
-    runway = f"{state.cash_runway_days} days" if state.cash_runway_days is not None else "unbounded"
-    text = (
-        f"As of {state.as_of}, cash is {_money(state.current_cash_cents)}. "
-        f"Expected inflows are {_money(state.expected_inflows_cents)} and expected outflows "
-        f"are {_money(state.expected_outflows_cents)}. Projected ending cash is "
-        f"{_money(state.projected_ending_cash_cents)}, with a reserve shortfall of "
-        f"{_money(state.projected_shortfall_cents)}. Cash runway is {runway}."
+    # One set of runtime fact slots feeds both English and localized presentation.
+    segments = []
+    runway = (
+        TEMPLATES["en"]["days"].format(days=state.cash_runway_days)
+        if state.cash_runway_days is not None
+        else TEMPLATES["en"]["unbounded"]
+    )
+    segments.append(
+        (
+            "summary",
+            dict(
+                date=str(state.as_of),
+                cash=_money(state.current_cash_cents),
+                inflows=_money(state.expected_inflows_cents),
+                outflows=_money(state.expected_outflows_cents),
+                balance=_money(state.projected_ending_cash_cents),
+                shortfall=_money(state.projected_shortfall_cents),
+                runway=runway,
+            ),
+        )
     )
     referenced = []
     if request.focus == "runway":
-        text += (
-            f" Runway uses the recorded daily net burn of "
-            f"{_money(state.average_daily_net_burn_cents)}. "
-            "No previous snapshot is available to measure a decline."
-        )
+        segments.append(("runway", dict(burn=_money(state.average_daily_net_burn_cents))))
     elif request.focus == "changes":
         referenced = [signal.id for signal in signals]
-        text += " Recorded warnings: " + "; ".join(signal.title for signal in signals) + "."
-        text += " These belong to the demo snapshot; no live daily change feed is available."
+        segments.append(("changes", dict(warnings="; ".join(signal.title for signal in signals))))
     elif request.focus == "biggest_risk":
         order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
         ranked = sorted(signals, key=lambda signal: (order[signal.impact_level], signal.id))
         if ranked:
             risk = ranked[0]
             referenced = [risk.id]
-            text += f" Highest recorded severity: {risk.title}. {risk.description}"
+            segments.append(("risk", dict(title=risk.title, description=risk.description)))
     scenario = None
     if request.scenario is not None:
         scenario = calculate_scenario(state, request.scenario)
         projected = scenario.projected
-        text += (
-            f" Under the supplied scenario, projected ending cash is "
-            f"{_money(projected.projected_ending_cash_cents)} and the reserve shortfall is "
-            f"{_money(projected.projected_shortfall_cents)}. " + " ".join(scenario.assumptions)
+        segments.append(
+            (
+                "scenario",
+                dict(
+                    balance=_money(projected.projected_ending_cash_cents),
+                    shortfall=_money(projected.projected_shortfall_cents),
+                    assumptions=" ".join(scenario.assumptions),
+                ),
+            )
         )
+    english = "".join(TEMPLATES["en"][key].format(**facts) for key, facts in segments)
+    text = english
+    language = request.language
     provider = ProviderMetadata(
         requested_provider=settings.voice_provider,
         provider=settings.voice_provider,
@@ -111,18 +128,36 @@ def create_briefing(
         else FixtureVoiceProvider()
     )
     try:
+        localized = []
+        for key, facts in segments:
+            facts = facts.copy()
+            if key == "summary":
+                facts["runway"] = (
+                    render_segment(language, "days", days=str(state.cash_runway_days))
+                    if state.cash_runway_days is not None
+                    else render_segment(language, "unbounded")
+                )
+            localized.append(render_segment(language, key, **facts))
+        candidate = "".join(localized)
+        if numeric_facts(candidate) != numeric_facts(english):
+            raise ProviderFailure("grounding_validation_failed")
+        text = candidate
         audio = synthesizer.synthesize(text)
     except (ProviderFailure, httpx.HTTPError) as error:
         provider = ProviderMetadata(
-            requested_provider="elevenlabs",
+            requested_provider=settings.voice_provider,
             provider="fixture",
             mode="fallback",
             failure_reason=str(error)
             if isinstance(error, ProviderFailure)
             else "provider_unavailable",
         )
+        if isinstance(error, ProviderFailure) and str(error) == "grounding_validation_failed":
+            text = english
+            language = "en"
         audio = FixtureVoiceProvider().synthesize(text)
     return VoiceResponse(
+        language=language,
         text=text,
         financial_state=state,
         signal_ids=referenced,
