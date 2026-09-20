@@ -52,6 +52,22 @@ class CashFlowEntry(StrictModel):
     source_document_id: str | None = None
 
 
+class ForecastAdjustment(StrictModel):
+    id: str
+    source_signal_id: str
+    source_document_id: str
+    source_filename: str
+    entity: str
+    type: Literal["supplier_pricing_increase"]
+    monthly_amount_cents: NonNegativeMoney
+    amount_cents: Annotated[int, Field(gt=0)]
+    cadence: Literal["monthly"] = "monthly"
+    effective_date: date
+    application_status: Literal["incorporated"] = "incorporated"
+    calculation_explanation: str
+    applied_at: datetime
+
+
 class FinancialState(StrictModel):
     business_id: str
     as_of: date
@@ -65,6 +81,7 @@ class FinancialState(StrictModel):
     average_daily_net_burn_cents: NonNegativeMoney
     cash_runway_days: int | None
     cash_flow: list[CashFlowEntry]
+    forecast_adjustments: list[ForecastAdjustment] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_calculated_values(self) -> FinancialState:
@@ -198,7 +215,7 @@ class Signal(StrictModel):
     evidence: Annotated[list[SignalEvidence], Field(min_length=1)]
     source_document_id: str
     extraction: ExtractionProvenance | None = None
-    disposition: Literal["baseline", "proposed", "duplicate"] = "baseline"
+    disposition: Literal["baseline", "proposed", "duplicate", "incorporated"] = "baseline"
     duplicate_of_signal_id: str | None = None
 
     @model_validator(mode="after")

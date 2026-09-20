@@ -197,7 +197,7 @@ def extract_document(
                 financial_state=repo.get_financial_state(),
                 application_status="potential_duplicate"
                 if cached.disposition == "duplicate"
-                else "proposed",
+                else cached.disposition,
             )
         content = repo.get_uploaded_text(document.id)
     else:
@@ -292,7 +292,7 @@ def extract_document(
             financial_state=repo.get_financial_state(),
             application_status="potential_duplicate"
             if saved.disposition == "duplicate"
-            else "proposed",
+            else saved.disposition,
         )
 
     # This fixture already accounts for the supplier effect. Never apply it twice or
