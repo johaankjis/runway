@@ -1,9 +1,9 @@
 "use client";
 
-import type { VoiceLanguage, VoiceResponse } from "@runway/contracts";
+import type { VoiceLanguage, VoiceQuestionResponse, VoiceResponse } from "@runway/contracts";
 import { AlertTriangle, ArrowRight, ChevronDown, FlaskConical, Globe, Quote, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { ProviderBadge } from "@/components/domain/ProviderBadge";
 import { VoiceAssistantPanel, type VoiceStatus } from "@/components/domain/VoiceAssistantPanel";
@@ -13,17 +13,22 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { ErrorState, LoadingState } from "@/components/ui/States";
 import { useApi } from "@/hooks/useApi";
-import { api, ApiError, NetworkError } from "@/lib/api";
+import { api, askVoiceQuestion, ApiError, NetworkError } from "@/lib/api";
 import { formatCents } from "@/lib/format";
 import { sortByImpact } from "@/lib/presentation";
 import { providerDescription } from "@/lib/providers";
 import { DEFAULT_PROMPT, decodeAudio, VOICE_PROMPTS, type VoicePrompt } from "@/lib/voice";
 
+import { recognitionConstructor, createSpeechSession, type SpeechSession } from "@/lib/speech-recognition";
+
+const subscribeSupport = () => () => {};
+const speechSupported = () => Boolean(recognitionConstructor());
+
 type AudioState = { kind: "none" } | { kind: "ready"; url: string } | { kind: "malformed" };
 
 interface Briefing {
   prompt: VoicePrompt;
-  response: VoiceResponse;
+  response: VoiceResponse | VoiceQuestionResponse;
   audio: AudioState;
 }
 
@@ -50,10 +55,26 @@ export function VoiceView() {
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [activePrompt, setActivePrompt] = useState<VoicePrompt | null>(null);
+  const [question, setQuestion] = useState("");
+  const [asked, setAsked] = useState("");
+  const [listening, setListening] = useState(false);
+  const [speechMessage, setSpeechMessage] = useState("");
+  const recognitionRef = useRef<SpeechSession | null>(null);
+  const typedRef = useRef<HTMLInputElement>(null);
+  const requestId = useRef(0);
+  const supported = useSyncExternalStore(subscribeSupport, speechSupported, () => true);
+  useEffect(() => {
+    const requests = requestId;
+    return () => {
+      const recognition = recognitionRef.current;
+      recognitionRef.current = null;
+      recognition?.cancel();
+      requests.current++;
+    };
+  }, []);
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const objectUrlRef = useRef<string | null>(null);
-  const requestId = useRef(0);
 
   const releaseAudio = useCallback(() => {
     if (objectUrlRef.current) {
@@ -65,7 +86,11 @@ export function VoiceView() {
   useEffect(() => releaseAudio, [releaseAudio]);
 
   const generate = useCallback(
-    async (prompt: VoicePrompt) => {
+    async (prompt: VoicePrompt, spokenQuestion?: string) => {
+      recognitionRef.current?.cancel();
+      recognitionRef.current = null;
+      setListening(false);
+      setAsked(spokenQuestion ?? "");
       const id = ++requestId.current;
       setActivePrompt(prompt);
       setPhase("generating");
@@ -73,7 +98,9 @@ export function VoiceView() {
       setPlaying(false);
       audioRef.current?.pause();
       try {
-        const response = await api.createVoiceBriefing({ ...prompt.request, language });
+        const response = spokenQuestion
+          ? await askVoiceQuestion({ question: spokenQuestion, language })
+          : await api.createVoiceBriefing({ ...prompt.request, language });
         if (id !== requestId.current) return;
         releaseAudio();
         let audio: AudioState = { kind: "none" };
@@ -107,7 +134,7 @@ export function VoiceView() {
 
   const hasLiveAudio = briefing?.audio.kind === "ready";
   const status: VoiceStatus =
-    phase === "generating"
+    listening ? "listening" : phase === "generating"
       ? "generating"
       : phase === "error"
         ? "error"
@@ -121,32 +148,40 @@ export function VoiceView() {
               : "fixture"
           : "idle";
 
-  const onPrimary = () => {
-    if (status === "playing") {
-      audioRef.current?.pause();
-      return;
-    }
-    if (status === "ready" && hasLiveAudio) {
-      audioRef.current?.play().catch(() => undefined);
-      return;
-    }
-    void generate(activePrompt ?? DEFAULT_PROMPT);
+  const submitQuestion = (value: string) => {
+    const trimmed = value.trim();
+    if (trimmed) void generate({ id: "question", label: trimmed, request: {} }, trimmed);
   };
 
-  const primaryLabel =
-    status === "playing"
-      ? "Pause briefing audio"
-      : status === "ready"
-        ? "Play briefing audio"
-        : status === "generating"
-          ? "Generating briefing"
-          : `Generate briefing: ${(activePrompt ?? DEFAULT_PROMPT).label}`;
+  const onPrimary = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      return;
+    }
+    audioRef.current?.pause();
+    setPlaying(false);
+    setSpeechMessage("");
+    const session = createSpeechSession(language, {
+      onListening: () => setListening(true),
+      onTranscript: (transcript) => {
+        setQuestion(transcript);
+        submitQuestion(transcript);
+      },
+      onError: (message) => { setSpeechMessage(message); setListening(false); },
+      onEnd: () => { recognitionRef.current = null; setListening(false); },
+    });
+    if (!session) { typedRef.current?.focus(); return; }
+    recognitionRef.current = session;
+    session.start();
+  };
+
+  const primaryLabel = listening ? "Stop listening" : "Ask Runway";
 
   const topSignals = sortByImpact(signals.data ?? []).slice(0, 3);
   const signalsById = new Map((signals.data ?? []).map((signal) => [signal.id, signal]));
   const contextState = briefing?.response.financial_state ?? state.data;
   const failure = phase === "error" && error ? describeError(error) : null;
-  const retry = () => void generate(activePrompt ?? DEFAULT_PROMPT);
+  const retry = () => void generate(activePrompt ?? DEFAULT_PROMPT, asked || undefined);
 
   return (
     <div className="animate-fade-in">
@@ -170,13 +205,14 @@ export function VoiceView() {
               <span className="sr-only">Briefing language</span>
               <select
                 value={language}
-                disabled={phase === "generating"}
+                disabled={phase === "generating" || listening}
                 onChange={(event) => {
                   setLanguage(event.target.value as VoiceLanguage);
                   audioRef.current?.pause();
                   setPlaying(false);
                   releaseAudio();
                   setBriefing(null);
+                  setAsked("");
                   setPhase("idle");
                   setError(null);
                 }}
@@ -196,11 +232,27 @@ export function VoiceView() {
               <span>{providerDescription(briefing.response.provider, "voice")}</span>
             ) : (
               <span>
-                Powered by ElevenLabs · Briefing text is composed by the deterministic engine; ElevenLabs speaks it when a live voice provider is configured.
+                Speak or type a question about verified Runway facts. Browser speech recognition may use your browser provider’s speech service. Only the transcript is sent to Runway.
               </span>
             )
           }
         />
+
+        <form className="flex flex-wrap items-center gap-3" onSubmit={(event) => { event.preventDefault(); submitQuestion(question); }}>
+          <input ref={typedRef} value={question} maxLength={500}
+            onChange={(event) => setQuestion(event.target.value)}
+            aria-label="Your financial question"
+            placeholder="Ask a question about your finances…"
+            className="min-w-0 flex-1 rounded-xl border border-line bg-white px-4 py-3 text-sm" />
+          <Button type="submit" disabled={!question.trim() || phase === "generating" || listening}>Ask</Button>
+          {listening ? <Button type="button" variant="ghost" onClick={() => {
+            const recognition = recognitionRef.current;
+            recognitionRef.current = null;
+            recognition?.cancel();
+            setListening(false);
+          }}>Cancel</Button> : null}
+          {speechMessage || !supported ? <p role="status" className="w-full text-sm text-muted">{speechMessage || "Speech recognition is not supported in this browser. Type a question or use a suggested question."}</p> : null}
+        </form>
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr_1fr]">
           <Card>
@@ -210,12 +262,18 @@ export function VoiceView() {
               action={briefing ? <ProviderBadge meta={briefing.response.provider} kind="voice" /> : null}
             />
 
+            {asked ? <div className="mb-4"><p className="text-xs font-bold text-muted">YOU ASKED</p><p>{asked}</p></div> : null}
             {phase === "generating" ? (
               <LoadingState label="Generating briefing" lines={4} />
             ) : failure ? (
               <ErrorState title={failure.title} error={failure.message} onRetry={retry} />
             ) : briefing ? (
               <div className="space-y-4">
+                <p className="text-xs font-bold text-muted">RUNWAY</p>
+                {"answer_provider" in briefing.response ? <p className="text-xs text-muted">
+                  Answer: {briefing.response.answer_provider.provider} · {briefing.response.answer_provider.mode}
+                  {briefing.response.answer_provider.failure_reason ? ` · ${briefing.response.answer_provider.failure_reason}` : ""}
+                </p> : null}
                 <blockquote className="flex items-start gap-3 rounded-xl bg-canvas p-4">
                   <Quote className="mt-1 h-4 w-4 shrink-0 text-info-500" aria-hidden />
                   <p

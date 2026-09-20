@@ -222,3 +222,13 @@ export const api: RunwayApi = {
   extractDocument: withFallback(liveApi.extractDocument, fixtureApi.extractDocument),
   createVoiceBriefing: withFallback(liveApi.createVoiceBriefing, fixtureApi.createVoiceBriefing),
 };
+
+
+/** Questions always reach the backend; never answer from a stale browser fixture. */
+export function askVoiceQuestion(payload: import("@runway/contracts").VoiceQuestionRequest) {
+  return request<import("@runway/contracts").VoiceQuestionResponse>("/api/voice/question", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}

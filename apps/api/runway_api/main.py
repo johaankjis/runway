@@ -11,7 +11,13 @@ from starlette.datastructures import UploadFile
 
 from runway_api.extraction import extract_document
 from runway_api.financial_engine import calculate_scenario
-from runway_api.integration_models import ExtractionResponse, VoiceRequest, VoiceResponse
+from runway_api.integration_models import (
+    ExtractionResponse,
+    VoiceQuestionRequest,
+    VoiceQuestionResponse,
+    VoiceRequest,
+    VoiceResponse,
+)
 from runway_api.models import (
     Business,
     Document,
@@ -27,6 +33,7 @@ from runway_api.provider_config import ProviderSettings
 from runway_api.repository import InMemoryRepository
 from runway_api.uploads import MAX_FILE_BYTES, UploadValidationError, parse_upload
 from runway_api.voice import create_briefing
+from runway_api.voice_question import answer_question
 
 
 def get_repository(request: Request) -> InMemoryRepository:
@@ -150,6 +157,10 @@ def create_app(
             raise HTTPException(
                 status_code=422, detail="Document unsupported or unverifiable"
             ) from error
+
+    @application.post("/api/voice/question", response_model=VoiceQuestionResponse, tags=["voice"])
+    def voice_question(payload: VoiceQuestionRequest, repo: RepositoryDependency):
+        return answer_question(repo, payload, provider_settings)
 
     @application.post("/api/voice/briefing", response_model=VoiceResponse, tags=["voice"])
     def voice_briefing(

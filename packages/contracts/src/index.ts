@@ -197,3 +197,15 @@ export interface VoiceResponse {
   audio_base64: string | null;
   audio_mime_type: "audio/mpeg" | null;
 }
+
+
+export interface VoiceQuestionRequest {
+  question: string;
+  language?: VoiceLanguage;
+}
+
+export interface VoiceQuestionResponse extends VoiceResponse {
+  question: string;
+  answer_provider: ProviderMetadata;
+  grounding: "verified" | "deterministic_fallback";
+}
